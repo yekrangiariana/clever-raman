@@ -1,0 +1,11 @@
+# Node dependencies
+node_modules/
+dist/
+dist-webos/
+
+# Local Dev Configuration (fast login credentials)
+src/config/devConfig.ts
+
+# OS Files
+.DS_Store
+*.log
