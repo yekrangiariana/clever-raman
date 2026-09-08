@@ -15,6 +15,7 @@ import {
   CloseIcon,
   ArrowLeftIcon,
   MusicNoteIcon,
+  CheckIcon,
 } from './common/Icons';
 
 interface NowPlayingViewProps {
@@ -33,20 +34,77 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
   const track = () => audioPlayer.currentTrack();
   const [isStarred, setIsStarred] = createSignal<boolean>(false);
   const [showQueue, setShowQueue] = createSignal<boolean>(false);
+  const [isDragging, setIsDragging] = createSignal<boolean>(false);
+  const [dragTime, setDragTime] = createSignal<number | null>(null);
+
+  let progressBarRef: HTMLDivElement | undefined;
 
   const coverUrl = createMemo(() => {
     const t = track();
     if (!t) return '';
     if (t.starred) setIsStarred(true);
-    return api.getCoverArtUrl(t.coverArt || t.id, 800);
+    return api.getSongCoverArtUrl(t, 800);
+  });
+
+  const effectiveTime = createMemo(() => {
+    if (isDragging() && dragTime() !== null) return dragTime()!;
+    if (audioPlayer.isSeeking() && audioPlayer.seekPreviewTime() !== null) return audioPlayer.seekPreviewTime()!;
+    return audioPlayer.currentTime();
   });
 
   const progressPercent = createMemo(() => {
     const dur = audioPlayer.duration();
-    const cur = audioPlayer.currentTime();
+    const cur = effectiveTime();
     if (!dur) return 0;
     return Math.min(100, Math.max(0, (cur / dur) * 100));
   });
+
+  function getTimeFromPointer(e: PointerEvent): number {
+    if (!progressBarRef) return 0;
+    const rect = progressBarRef.getBoundingClientRect();
+    const dur = audioPlayer.duration();
+    if (!dur || rect.width <= 0) return 0;
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+    return ratio * dur;
+  }
+
+  function handlePointerDown(e: PointerEvent) {
+    e.stopPropagation();
+    focusEngine.setFocus('nowPlaying', 8, true);
+    if (progressBarRef) {
+      progressBarRef.setPointerCapture(e.pointerId);
+    }
+    setIsDragging(true);
+    const targetTime = getTimeFromPointer(e);
+    setDragTime(targetTime);
+  }
+
+  function handlePointerMove(e: PointerEvent) {
+    if (isDragging()) {
+      const targetTime = getTimeFromPointer(e);
+      setDragTime(targetTime);
+    }
+  }
+
+  function handlePointerUp(e: PointerEvent) {
+    if (isDragging()) {
+      if (progressBarRef && progressBarRef.hasPointerCapture(e.pointerId)) {
+        progressBarRef.releasePointerCapture(e.pointerId);
+      }
+      const targetTime = getTimeFromPointer(e);
+      audioPlayer.seek(targetTime);
+      setIsDragging(false);
+      setDragTime(null);
+    }
+  }
+
+  function handlePointerCancel(e: PointerEvent) {
+    if (isDragging()) {
+      setIsDragging(false);
+      setDragTime(null);
+    }
+  }
 
   const userQueue = () => audioPlayer.userQueue();
   const contextQueue = () => audioPlayer.contextQueue();
@@ -56,6 +114,24 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
     const cq = contextQueue();
     const cIdx = contextIndex();
     return cIdx < cq.length - 1 ? cq.slice(cIdx + 1) : [];
+  });
+
+  const pastContext = createMemo(() => {
+    const history = audioPlayer.playedHistory();
+    const cq = contextQueue();
+    const cIdx = contextIndex();
+    const pastCq = cIdx > 0 ? cq.slice(0, cIdx) : [];
+
+    const map = new Map<string, Song>();
+    history.forEach((s) => map.set(s.id, s));
+    pastCq.forEach((s) => map.set(s.id, s));
+
+    const curr = track();
+    if (curr) {
+      map.delete(curr.id);
+    }
+
+    return Array.from(map.values());
   });
 
   const hasClear = createMemo(() => userQueue().length > 0);
@@ -86,7 +162,8 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
     setShowQueue(next);
     if (next) {
       setTimeout(() => {
-        focusEngine.setFocus('nowPlayingQueue', 0);
+        const playingIndex = pastContext().length;
+        focusEngine.setFocus('nowPlayingQueue', playingIndex);
       }, 50);
     } else {
       focusEngine.setFocus('nowPlaying', 7);
@@ -301,8 +378,67 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
             <div class="w-full h-px bg-white/15 mb-4 shrink-0" />
 
             {/* Queue Scrollable List */}
-            <div class="flex-1 overflow-y-auto flex flex-col gap-1.5 pr-2">
-              {/* 1. Currently Playing Track at Top */}
+            <div class="flex-1 overflow-y-auto flex flex-col gap-1.5 px-8 py-6 -mx-8 -my-6 [scroll-padding:24px]">
+              {/* 1. Completed Past Context Queue Items (Dimmed State with Checkmark) */}
+              <For each={pastContext()}>
+                {(song, pastIndex) => {
+                  return (
+                    <div class="flex flex-col w-full opacity-45 hover:opacity-80 transition-opacity">
+                      <div
+                        onClick={() => {
+                          const cq = contextQueue();
+                          const idx = cq.findIndex((s) => s.id === song.id);
+                          if (idx >= 0) {
+                            audioPlayer.jumpToContextIndex(idx);
+                          } else {
+                            audioPlayer.playTrack(song);
+                          }
+                        }}
+                        class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-transparent text-neutral-300 hover:bg-neutral-800/60"
+                        data-focusable="true"
+                        data-variant="list"
+                        data-section="nowPlayingQueue"
+                        data-index={pastIndex()}
+                      >
+                        <div class="flex items-center gap-5 truncate flex-1 min-w-0">
+                          <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10 opacity-70">
+                            {song.coverArt || song.albumId || song.id ? (
+                              <img
+                                src={api.getSongCoverArtUrl(song, 300)}
+                                alt={song.title}
+                                class="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div class="w-full h-full flex items-center justify-center text-neutral-600">
+                                <MusicNoteIcon class="w-8 h-8" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div class="w-8 flex items-center justify-center shrink-0">
+                            <CheckIcon class="w-6 h-6 text-neutral-400 font-bold" />
+                          </div>
+
+                          <div class="flex flex-col truncate min-w-0 flex-1">
+                            <span class="text-2xl font-bold truncate leading-snug text-neutral-300">{song.title}</span>
+                            <span class="text-lg truncate font-medium text-neutral-400">{song.artist}</span>
+                          </div>
+                        </div>
+
+                        <div class="flex items-center gap-6 shrink-0 ml-4">
+                          <span class="font-mono text-xl font-medium text-neutral-400">
+                            {formatDuration(song.duration)}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="w-full h-px bg-white/10 my-0.5" />
+                    </div>
+                  );
+                }}
+              </For>
+
+              {/* 2. Currently Playing Track */}
               <Show when={track()}>
                 <div class="flex flex-col w-full">
                   <div
@@ -311,7 +447,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                     data-variant="list"
                     data-playing="true"
                     data-section="nowPlayingQueue"
-                    data-index="0"
+                    data-index={pastContext().length}
                   >
                     <div class="flex items-center gap-5 truncate flex-1 min-w-0">
                       <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
@@ -342,10 +478,9 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                 </div>
               </Show>
 
-              {/* 2. Manually Added User Queue Items */}
+              {/* 3. Manually Added User Queue Items */}
               <For each={userQueue()}>
                 {(song, uqIndex) => {
-                  const itemFocusIndex = 1 + uqIndex();
                   return (
                     <div class="flex flex-col w-full">
                       <div
@@ -354,15 +489,16 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                         data-focusable="true"
                         data-variant="list"
                         data-section="nowPlayingQueue"
-                        data-index={itemFocusIndex}
+                        data-index={pastContext().length + (track() ? 1 : 0) + uqIndex()}
                       >
                         <div class="flex items-center gap-5 truncate flex-1 min-w-0">
                           <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
-                            {song.coverArt || song.id ? (
+                            {song.coverArt || song.albumId || song.id ? (
                               <img
-                                src={api.getCoverArtUrl(song.coverArt || song.id, 300)}
+                                src={api.getSongCoverArtUrl(song, 300)}
                                 alt={song.title}
                                 class="w-full h-full object-cover"
+                                loading="lazy"
                               />
                             ) : (
                               <div class="w-full h-full flex items-center justify-center text-neutral-600">
@@ -391,7 +527,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                             data-focusable="true"
                             data-variant="topPick"
                             data-section="nowPlayingQueue_remove"
-                            data-index={itemFocusIndex}
+                            data-index={pastContext().length + (track() ? 1 : 0) + uqIndex()}
                             title="Remove from Queue"
                           >
                             <CloseIcon class="w-5 h-5" />
@@ -404,7 +540,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                 }}
               </For>
 
-              {/* 3. Subtle Context Separator (Apple Music style) */}
+              {/* 4. Subtle Context Separator (Apple Music style) */}
               <Show when={userQueue().length > 0 && upcomingContext().length > 0}>
                 <div class="flex items-center gap-4 my-3 px-3">
                   <div class="h-px bg-white/15 flex-1" />
@@ -415,10 +551,9 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                 </div>
               </Show>
 
-              {/* 4. Upcoming Context Queue Items */}
+              {/* 5. Upcoming Context Queue Items */}
               <For each={upcomingContext()}>
                 {(song, relIndex) => {
-                  const itemFocusIndex = 1 + userQueue().length + relIndex();
                   const actualContextIndex = contextIndex() + 1 + relIndex();
                   return (
                     <div class="flex flex-col w-full">
@@ -428,15 +563,16 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                         data-focusable="true"
                         data-variant="list"
                         data-section="nowPlayingQueue"
-                        data-index={itemFocusIndex}
+                        data-index={pastContext().length + (track() ? 1 : 0) + userQueue().length + relIndex()}
                       >
                         <div class="flex items-center gap-5 truncate flex-1 min-w-0">
                           <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
-                            {song.coverArt || song.id ? (
+                            {song.coverArt || song.albumId || song.id ? (
                               <img
-                                src={api.getCoverArtUrl(song.coverArt || song.id, 300)}
+                                src={api.getSongCoverArtUrl(song, 300)}
                                 alt={song.title}
                                 class="w-full h-full object-cover"
+                                loading="lazy"
                               />
                             ) : (
                               <div class="w-full h-full flex items-center justify-center text-neutral-600">
@@ -465,7 +601,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                             data-focusable="true"
                             data-variant="topPick"
                             data-section="nowPlayingQueue_remove"
-                            data-index={itemFocusIndex}
+                            data-index={pastContext().length + (track() ? 1 : 0) + userQueue().length + relIndex()}
                             title="Remove from Queue"
                           >
                             <CloseIcon class="w-5 h-5" />
@@ -489,16 +625,30 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
         </Show>
       </div>
 
-      {/* Bottom Stage: Full-Width Progress Bar */}
-      <div class="w-full flex flex-col gap-3 z-20 px-4 shrink-0">
-        <div class="w-full h-3 rounded-full bg-neutral-800/90 overflow-hidden relative">
-          <div
-            class="h-full bg-white rounded-full"
-            style={{ width: `${progressPercent()}%` }}
-          />
+      {/* Bottom Stage: Full-Width Interactive Progress Bar */}
+      <div class="w-full flex flex-col items-center gap-2 z-20 px-4 shrink-0 relative">
+        <div
+          ref={progressBarRef}
+          class="w-full py-2 cursor-pointer group select-none flex flex-col justify-center rounded-2xl"
+          data-focusable="true"
+          data-variant="seekBar"
+          data-section="nowPlaying"
+          data-index="8"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+        >
+          <div class="w-full h-3.5 rounded-full bg-neutral-800/90 relative flex items-center overflow-hidden border border-white/10 [.focused_&]:border-white [.focused_&]:ring-2 [.focused_&]:ring-white">
+            <div
+              class="h-full bg-white rounded-full transition-none"
+              style={{ width: `${progressPercent()}%` }}
+            />
+          </div>
         </div>
-        <div class="flex justify-between text-2xl font-mono font-bold text-white tracking-wider">
-          <span>{audioPlayer.formatElapsedTime()}</span>
+
+        <div class="w-full flex justify-between text-2xl font-mono font-bold text-white tracking-wider px-1">
+          <span>{formatDuration(effectiveTime())}</span>
           <span>{audioPlayer.formatRemainingTime()}</span>
         </div>
       </div>

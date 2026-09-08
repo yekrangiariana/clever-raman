@@ -23,6 +23,9 @@ function createAudioPlayer() {
   const [isPlaying, setIsPlaying] = createSignal<boolean>(false);
   const [currentTime, setCurrentTime] = createSignal<number>(0);
   const [duration, setDuration] = createSignal<number>(0);
+  const [isSeeking, setIsSeeking] = createSignal<boolean>(false);
+  const [seekPreviewTime, setSeekPreviewTime] = createSignal<number | null>(null);
+  const [seekOffsetBadge, setSeekOffsetBadge] = createSignal<string | null>(null);
 
   // Layer 1: Context Queue (Album or Playlist)
   const [contextQueue, setContextQueue] = createSignal<Song[]>([]);
@@ -31,6 +34,17 @@ function createAudioPlayer() {
 
   // Layer 2: User Queue (Explicitly queued songs by user)
   const [userQueue, setUserQueue] = createSignal<Song[]>([]);
+
+  // Layer 3: Played History (Tracks that finished playing during current session)
+  const [playedHistory, setPlayedHistory] = createSignal<Song[]>([]);
+
+  function recordHistory(song: Song) {
+    setPlayedHistory((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1].id === song.id) return prev;
+      const updated = [...prev, song];
+      return updated.length > 50 ? updated.slice(updated.length - 50) : updated;
+    });
+  }
 
   // Playback modes
   const [isShuffle, setIsShuffle] = createSignal<boolean>(false);
@@ -62,7 +76,9 @@ function createAudioPlayer() {
   const queueIndex = createMemo(() => 0); // Current track is always first in active derived queue
 
   audio.addEventListener('timeupdate', () => {
-    setCurrentTime(audio.currentTime || 0);
+    if (!isSeeking()) {
+      setCurrentTime(audio.currentTime || 0);
+    }
   });
 
   audio.addEventListener('durationchange', () => {
@@ -173,6 +189,10 @@ function createAudioPlayer() {
   }
 
   function startPlaybackStream(track: Song) {
+    const prevTrack = currentTrack();
+    if (prevTrack && prevTrack.id !== track.id) {
+      recordHistory(prevTrack);
+    }
     setCurrentTrack(track);
     const streamUrl = api.getStreamUrl(track.id);
     audio.src = streamUrl;
@@ -190,6 +210,11 @@ function createAudioPlayer() {
    * Clears user queue for fresh album playback.
    */
   function playTrack(track: Song, collection?: Song[], index?: number) {
+    // Starting a new track/album resets history and clears user queue
+    setPlayedHistory([]);
+    setUserQueue([]);
+    setCurrentTrack(null);
+
     if (collection && collection.length > 0) {
       setOriginalContextQueue([...collection]);
       if (isShuffle()) {
@@ -207,9 +232,6 @@ function createAudioPlayer() {
       setContextQueue([track]);
       setContextIndex(0);
     }
-
-    // Starting a new track/album sets a clean user queue
-    setUserQueue([]);
 
     startPlaybackStream(track);
   }
@@ -305,12 +327,60 @@ function createAudioPlayer() {
     playNextInHierarchy(true);
   }
 
+  let seekDebounceTimer: any = null;
+  let seekBadgeTimer: any = null;
+  let accumulatedStep = 0;
+  let stepAccumulatorTimer: any = null;
+
   function seek(seconds: number) {
     if (audio.duration) {
       const clamped = Math.max(0, Math.min(seconds, audio.duration));
       audio.currentTime = clamped;
       setCurrentTime(clamped);
+      setIsSeeking(false);
+      setSeekPreviewTime(null);
+      setSeekOffsetBadge(null);
     }
+  }
+
+  function seekDebounced(targetSeconds: number) {
+    const dur = duration() || audio.duration;
+    if (!dur) return;
+
+    const clamped = Math.max(0, Math.min(targetSeconds, dur));
+    setIsSeeking(true);
+    setSeekPreviewTime(clamped);
+
+    if (seekDebounceTimer) clearTimeout(seekDebounceTimer);
+
+    seekDebounceTimer = setTimeout(() => {
+      audio.currentTime = clamped;
+      setCurrentTime(clamped);
+      setIsSeeking(false);
+      setSeekPreviewTime(null);
+      if (seekBadgeTimer) clearTimeout(seekBadgeTimer);
+      seekBadgeTimer = setTimeout(() => setSeekOffsetBadge(null), 800);
+    }, 250);
+  }
+
+  function seekStep(offsetSeconds: number) {
+    const dur = duration() || audio.duration;
+    if (!dur) return;
+
+    const baseTime = seekPreviewTime() !== null ? seekPreviewTime()! : currentTime();
+    const target = Math.max(0, Math.min(baseTime + offsetSeconds, dur));
+
+    // Accumulate badge display string (+5s, +10s, -15s, etc.)
+    if (stepAccumulatorTimer) clearTimeout(stepAccumulatorTimer);
+    accumulatedStep += offsetSeconds;
+    const sign = accumulatedStep > 0 ? '+' : '';
+    setSeekOffsetBadge(`${sign}${accumulatedStep}s`);
+
+    stepAccumulatorTimer = setTimeout(() => {
+      accumulatedStep = 0;
+    }, 1200);
+
+    seekDebounced(target);
   }
 
   function formatRemainingTime(): string {
@@ -467,6 +537,7 @@ function createAudioPlayer() {
     contextQueue,
     contextIndex,
     userQueue,
+    playedHistory,
     isShuffle,
     repeatMode,
     upcomingCount,
@@ -498,6 +569,11 @@ function createAudioPlayer() {
     previousTrack,
     nextTrack,
     seek,
+    isSeeking,
+    seekPreviewTime,
+    seekOffsetBadge,
+    seekDebounced,
+    seekStep,
     formatRemainingTime,
     formatElapsedTime,
   };

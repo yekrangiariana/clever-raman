@@ -285,7 +285,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
                 class="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay"
                 style={{ 'background-image': 'url(./noise.png)', 'background-repeat': 'repeat' }}
               />
-              <div class="relative z-10 text-white font-black text-sm opacity-90 tracking-tight">NaviOS</div>
+              <div class="absolute top-4 right-5 text-white font-black text-sm opacity-90 tracking-tight">NaviOS</div>
               <div class="relative z-10 mt-auto mb-auto flex flex-col items-center justify-center text-center w-full">
                 <h3
                   class={`font-black text-white leading-[1.05] tracking-tighter uppercase w-full px-4 ${
@@ -318,7 +318,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
                 class="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay"
                 style={{ 'background-image': 'url(./noise.png)', 'background-repeat': 'repeat' }}
               />
-              <div class="relative z-10 text-white font-black text-sm opacity-90 tracking-tight">NaviOS</div>
+              <div class="absolute top-4 right-5 text-white font-black text-sm opacity-90 tracking-tight">NaviOS</div>
               <div class="relative z-10 mt-6">
                 <h3 class="text-5xl font-black text-white leading-[1.05] tracking-tight">
                   Favorites<br />Mix

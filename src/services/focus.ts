@@ -130,8 +130,8 @@ function createFocusEngine() {
             if (isFirstItem) {
               // First item in section -> scroll container 100% to top
               scrollParent.scrollTo({ top: 0, behavior: 'auto' });
-            } else if (isLastRow && !isListVariant) {
-              // Last item or bottom row (grids only) -> scroll container 100% to bottom
+            } else if (isLastRow) {
+              // Last item or bottom row -> scroll container 100% to bottom
               scrollParent.scrollTo({ top: scrollParent.scrollHeight, behavior: 'auto' });
             } else {
               const parentRect = scrollParent.getBoundingClientRect();
@@ -205,11 +205,11 @@ function createFocusEngine() {
         e.preventDefault();
         return;
       case 417:
-        audioPlayer.nextTrack();
+        audioPlayer.seekStep(5);
         e.preventDefault();
         return;
       case 412:
-        audioPlayer.previousTrack();
+        audioPlayer.seekStep(-5);
         e.preventDefault();
         return;
     }
@@ -343,7 +343,11 @@ function createFocusEngine() {
         setFocus('topBar', getTopBarIndexFromTab(activeTab()));
       }
     } else if (section === 'nowPlaying') {
-      if (index > 0) setFocus('nowPlaying', 0);
+      if (index === 8) {
+        setFocus('nowPlaying', 2);
+      } else if (index > 0) {
+        setFocus('nowPlaying', 0);
+      }
     } else if (section === 'nowPlayingQueue_header') {
       setFocus('nowPlaying', 7);
     } else if (section === 'nowPlayingQueue') {
@@ -361,6 +365,8 @@ function createFocusEngine() {
       const prevBtn = document.querySelector(`[data-section="nowPlayingQueue_remove"][data-index="${index - 1}"]`);
       if (prevBtn) {
         setFocus('nowPlayingQueue_remove' as FocusSection, index - 1);
+      } else if (index > 0) {
+        setFocus('nowPlayingQueue', index - 1);
       } else {
         setFocus('nowPlayingQueue', 0);
       }
@@ -474,9 +480,8 @@ function createFocusEngine() {
     } else if (section === 'nowPlaying') {
       if (index === 0) {
         setFocus('nowPlaying', 2);
-      } else if (index === 6) {
-        const queueElem = document.querySelector('[data-section="nowPlayingQueue"]');
-        if (queueElem) setFocus('nowPlayingQueue', 0);
+      } else if (index < 8) {
+        setFocus('nowPlaying', 8);
       }
     } else if (section === 'nowPlayingQueue_header') {
       const queueTrack = document.querySelector('[data-section="nowPlayingQueue"][data-index="0"]');
@@ -487,6 +492,8 @@ function createFocusEngine() {
       const nextBtn = document.querySelector(`[data-section="nowPlayingQueue_remove"][data-index="${index + 1}"]`);
       if (nextBtn) {
         setFocus('nowPlayingQueue_remove' as FocusSection, index + 1);
+      } else if (index < totalCount - 1) {
+        setFocus('nowPlayingQueue', index + 1);
       }
     } else if (section.endsWith('_queue') || section.endsWith('_heart')) {
       const nextBtn = document.querySelector(`[data-section="${section}"][data-index="${index + 1}"]`);
@@ -553,7 +560,11 @@ function createFocusEngine() {
         if (index > 0) setFocus('albumDetail', index - 1);
       }
     } else if (section === 'nowPlaying') {
-      if (index > 0) setFocus('nowPlaying', index - 1);
+      if (index === 8) {
+        audioPlayer.seekStep(-5);
+      } else if (index > 0) {
+        setFocus('nowPlaying', index - 1);
+      }
     } else if (section === 'nowPlayingQueue_header') {
       setFocus('nowPlaying', 7);
     } else if (section === 'nowPlayingQueue') {
@@ -632,10 +643,13 @@ function createFocusEngine() {
         setFocus('albumDetail', index + 1);
       }
     } else if (section === 'nowPlaying') {
-      if (index === 7) {
-        const queueElem = document.querySelector('[data-section="nowPlayingQueue"]');
-        if (queueElem) setFocus('nowPlayingQueue', 0);
-      } else if (index < totalCount - 1) {
+      if (index === 8) {
+        audioPlayer.seekStep(5);
+      } else if (index === 7) {
+        const playingTrack = document.querySelector('[data-section="nowPlayingQueue"][data-playing="true"]');
+        const defaultIndex = playingTrack ? parseInt(playingTrack.getAttribute('data-index') || '0', 10) : 0;
+        setFocus('nowPlayingQueue', defaultIndex);
+      } else if (index < 7) {
         setFocus('nowPlaying', index + 1);
       }
     } else if (section === 'nowPlayingQueue') {

@@ -29,27 +29,30 @@
 }
 
 /* Card Focus (Grid items, Cover arts, Mix cards) - Fast, Crisp Scale Animation */
-[data-focusable="true"]:not([data-variant="list"]) {
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]) {
   outline: none;
   will-change: transform;
   transition: transform 0.12s ease-out !important;
 }
 
-[data-focusable="true"]:not([data-variant="list"]).focused {
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]).focused {
   outline: none !important;
   transform: scale3d(1.05, 1.05, 1) !important;
   z-index: 30;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.95) !important;
 }
 
-/* Top Pick Cards Focus (No scale/grow animation for max performance, crisp focus ring only) */
+/* Top Pick Cards Focus (Zero animations/fade-in, instant 0ms white border ring) */
 [data-focusable="true"][data-variant="topPick"] {
-  transition: box-shadow 0.08s ease-out !important;
+  transition: none !important;
+  transform: none !important;
+  will-change: auto !important;
 }
 
 [data-focusable="true"][data-variant="topPick"].focused {
   transform: none !important;
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.95) !important;
+  transition: none !important;
+  box-shadow: 0 0 0 4px #ffffff !important;
   z-index: 30;
 }
 
@@ -60,11 +63,24 @@
 }
 
 /* Card Tactile Press Down State (Keydown Enter / Active Click) */
-[data-focusable="true"]:not([data-variant="list"]).pressed,
-[data-focusable="true"]:not([data-variant="list"]):active {
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]).pressed,
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):active {
   transform: scale3d(0.93, 0.93, 1) !important;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 255, 255, 0.7) !important;
   transition: transform 0.06s ease-out !important;
+}
+
+/* Seek Bar Focus & Press Override (Dimensions & length must stay 100% fixed) */
+[data-focusable="true"][data-variant="seekBar"],
+[data-focusable="true"][data-variant="seekBar"] *,
+[data-focusable="true"][data-variant="seekBar"].focused,
+[data-focusable="true"][data-variant="seekBar"].pressed,
+[data-focusable="true"][data-variant="seekBar"]:active,
+[data-focusable="true"][data-variant="seekBar"]:hover {
+  transform: none !important;
+  transition: none !important;
+  box-shadow: none !important;
+  will-change: auto !important;
 }
 
 /* List Row Focus (Track lists, Queue items) - Unified Semi-Transparent Glass Selection */

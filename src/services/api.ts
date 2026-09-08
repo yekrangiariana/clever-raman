@@ -488,6 +488,15 @@ class SubsonicApi {
     const auth = this.getAuthParams();
     return `${this.config.serverUrl}/rest/getCoverArt.view?${auth}&id=${encodeURIComponent(id)}&size=${size}`;
   }
+
+  /**
+   * Get song cover art URL, prioritizing albumId to ensure 100% browser image cache reuse for tracks in the same album
+   */
+  public getSongCoverArtUrl(song?: Song | null, size = 300): string {
+    if (!song) return '';
+    const coverId = song.coverArt || song.albumId || song.id;
+    return this.getCoverArtUrl(coverId, size);
+  }
 }
 
 export const api = new SubsonicApi();
