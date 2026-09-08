@@ -23,7 +23,7 @@ export const QueueSidebar: Component<QueueSidebarProps> = (props) => {
   return (
     <Show when={props.isOpen}>
       <aside
-        class="fixed right-0 top-0 bottom-0 w-[480px] bg-neutral-950/95 border-l border-neutral-800 shadow-2xl z-50 flex flex-col p-8 backdrop-blur-xl animate-slide-left"
+        class="fixed right-0 top-0 bottom-0 w-[480px] bg-neutral-950/95 border-l border-neutral-800 shadow-2xl z-50 flex flex-col p-8  animate-slide-left"
         data-sidebar="queue"
       >
         {/* Header */}

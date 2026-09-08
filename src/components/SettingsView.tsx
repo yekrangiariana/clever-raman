@@ -238,7 +238,7 @@ export const SettingsView: Component = () => {
 
       {/* SERVER MODAL DIALOG OVERLAY */}
       <Show when={focusEngine.activeModal() === 'settingsServer'}>
-        <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-2xl flex items-center justify-center p-8 animate-fade-in">
+        <div class="fixed inset-0 z-50 bg-black/80  flex items-center justify-center p-8 animate-fade-in">
           <div class="w-[640px] rounded-[2.5rem] bg-[#1c1e24] border border-neutral-700/80 p-10 flex flex-col gap-8 shadow-2xl">
             <div class="flex flex-col gap-2">
               <h2 class="text-4xl font-black text-white tracking-tight">Server URL</h2>
@@ -285,7 +285,7 @@ export const SettingsView: Component = () => {
 
       {/* ACCOUNT MODAL DIALOG OVERLAY */}
       <Show when={focusEngine.activeModal() === 'settingsAccount'}>
-        <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-2xl flex items-center justify-center p-8 animate-fade-in">
+        <div class="fixed inset-0 z-50 bg-black/80  flex items-center justify-center p-8 animate-fade-in">
           <div class="w-[640px] rounded-[2.5rem] bg-[#1c1e24] border border-neutral-700/80 p-10 flex flex-col gap-8 shadow-2xl">
             <div class="flex flex-col gap-2">
               <h2 class="text-4xl font-black text-white tracking-tight">Active Account</h2>

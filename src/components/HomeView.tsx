@@ -130,7 +130,7 @@ export const HomeView: Component<HomeViewProps> = (props) => {
     }
     const data = await prefetchHomeData();
     return data || { newest: [], starred: [], starredTracks: [], random: [], genres: [], playlists: [] };
-  });
+  }, { initialValue: cachedHomeData || undefined });
 
   createEffect(() => {
     // Set 5 columns grid layout for larger cards and smooth navigation

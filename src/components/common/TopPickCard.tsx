@@ -33,22 +33,22 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
         {/* VARIANT 1: ALBUM (Dynamic ambient blur + floating 3D cover + Apple Music editorial typography) */}
         {props.variant === 'album' && (
           <div class="w-full h-full relative flex flex-col p-5 overflow-hidden bg-neutral-950">
-            {/* Dynamic Ambient Blur Background (Derived from album artwork) */}
+            {/* Dynamic Ambient Background (Removed blur for webOS performance) */}
             <Show when={props.coverArtUrl}>
               <div class="absolute inset-0 overflow-hidden pointer-events-none">
                 <img
                   src={props.coverArtUrl}
                   alt=""
-                  class="w-full h-full object-cover scale-150 blur-2xl opacity-60 saturate-[1.65] contrast-125 transform-gpu"
+                  class="w-full h-full object-cover scale-150 opacity-20 transform-gpu"
                 />
               </div>
             </Show>
 
             {/* Dark Ambient Gradient Mask for legibility & contrast */}
-            <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-black/50 to-black/90 pointer-events-none" />
+            <div class="absolute inset-0 bg-gradient-to-b from-black/50 via-black/80 to-black/95 pointer-events-none" />
 
             {/* Brand Tag Top-Right (Scaled up for TV) */}
-            <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-md text-white/95 border border-white/10 shadow-md pointer-events-none">
+            <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/80 text-white/95 border border-white/10 shadow-md pointer-events-none">
               <span class="text-base font-black tracking-wider uppercase">NaviOS</span>
             </div>
 
@@ -57,7 +57,7 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
               <Show
                 when={props.coverArtUrl}
                 fallback={
-                  <div class="w-36 h-36 rounded-xl bg-neutral-800/80 backdrop-blur-md flex items-center justify-center text-white/50 shadow-2xl border border-white/10">
+                  <div class="w-36 h-36 rounded-xl bg-neutral-800 flex items-center justify-center text-white/50 shadow-2xl border border-white/10">
                     <MusicNoteIcon class="w-16 h-16" />
                   </div>
                 }
@@ -93,7 +93,7 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
           <div class="w-full h-full flex flex-col bg-gradient-to-b from-[#e51d48] to-[#be123c]">
             <div class="w-full aspect-square relative flex items-center justify-center overflow-hidden">
               {/* Brand Tag Top-Right (Scaled up for TV) */}
-              <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/25 backdrop-blur-sm text-white/95 shadow-md">
+              <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 text-white/95 shadow-md">
                 <span class="text-base font-black tracking-wider uppercase">NaviOS</span>
               </div>
 
@@ -127,7 +127,7 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
           <>
             <div class="w-full aspect-square relative bg-neutral-950 flex items-center justify-center overflow-hidden">
               {/* Brand Tag Top-Right (Scaled up for TV) */}
-              <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/65 backdrop-blur-md text-white/95 border border-white/10 shadow-sm">
+              <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/80 text-white/95 border border-white/10 shadow-sm">
                 <span class="text-sm font-black tracking-wider uppercase">NaviOS</span>
               </div>
 
@@ -166,14 +166,10 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
               background: 'linear-gradient(145deg, #7c3aed 0%, #a855f7 45%, #4338ca 100%)',
             }}
           >
-            {/* Film grain overlay */}
-            <div
-              class="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay"
-              style={{ 'background-image': 'url(./noise.png)', 'background-repeat': 'repeat' }}
-            />
+            {/* Noise overlay removed for webOS performance */}
 
             {/* Brand Tag Top-Right (Scaled up for TV) */}
-            <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/25 backdrop-blur-sm text-white/95 shadow-md">
+            <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 text-white/95 shadow-md">
               <span class="text-base font-black tracking-wider uppercase">NaviOS</span>
             </div>
 
@@ -222,12 +218,9 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
                 background: 'linear-gradient(135deg, #f59e0b 0%, #ea580c 50%, #e11d48 100%)',
               }}
             >
-              <div
-                class="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay"
-                style={{ 'background-image': 'url(./noise.png)', 'background-repeat': 'repeat' }}
-              />
+              {/* Noise overlay removed for webOS performance */}
               {/* Brand Tag Top-Right (Scaled up for TV) */}
-              <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/25 backdrop-blur-sm text-white/95 shadow-md">
+              <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 text-white/95 shadow-md">
                 <span class="text-base font-black tracking-wider uppercase">NaviOS</span>
               </div>
               <div class="relative z-20 mt-auto mb-auto flex flex-col items-center justify-center text-center w-full px-1">

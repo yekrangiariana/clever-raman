@@ -23,7 +23,7 @@
 
 /* Focusable Elements Common Base */
 [data-focusable="true"],
-.flex-col:has(> [data-focusable="true"]) {
+[data-card-wrapper="true"] {
   scroll-margin-top: 140px;
   scroll-margin-bottom: 96px;
 }
@@ -45,12 +45,12 @@
 /* Top Pick Cards Focus (Zero animations/fade-in, instant 0ms white border ring) */
 [data-focusable="true"][data-variant="topPick"] {
   transition: none !important;
-  transform: none !important;
-  will-change: auto !important;
+  transform: translateZ(0) !important;
+  will-change: transform !important;
 }
 
 [data-focusable="true"][data-variant="topPick"].focused {
-  transform: none !important;
+  transform: translateZ(0) !important;
   transition: none !important;
   box-shadow: 0 0 0 4px #ffffff !important;
   z-index: 30;
@@ -58,7 +58,7 @@
 
 [data-focusable="true"][data-variant="topPick"].pressed,
 [data-focusable="true"][data-variant="topPick"]:active {
-  transform: none !important;
+  transform: translateZ(0) !important;
   transition: none !important;
 }
 
