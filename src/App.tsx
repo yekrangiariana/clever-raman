@@ -4,8 +4,8 @@ import { audioPlayer } from './services/audio';
 import { focusEngine } from './services/focus';
 import { AmbientGlow } from './components/AmbientGlow';
 import { TopBar } from './components/TopBar';
-import { HomeView } from './components/HomeView';
-import { MainGrid } from './components/MainGrid';
+import { HomeView, prefetchHomeData } from './components/HomeView';
+import { MainGrid, prefetchAlbums } from './components/MainGrid';
 import { PlaylistsView } from './components/PlaylistsView';
 import { AlbumDetailView } from './components/AlbumDetailView';
 import { NowPlayingView } from './components/NowPlayingView';
@@ -23,20 +23,41 @@ export const App: Component = () => {
   const [selectedArtist, setSelectedArtist] = createSignal<string | null>(null);
 
   onMount(() => {
-    // Hold splash screen for a smooth, high-quality entrance, then fade out smoothly
-    const splash = document.getElementById('app-splash');
-    if (splash) {
-      setTimeout(() => {
+    let splashDismissed = false;
+    const dismissSplash = () => {
+      if (splashDismissed) return;
+      splashDismissed = true;
+      const splash = document.getElementById('app-splash');
+      if (splash) {
         splash.classList.add('fade-out');
         setTimeout(() => splash.remove(), 500);
-      }, 1200);
-    }
+      }
+    };
 
     if (!api.isConfigured()) {
       focusEngine.setActiveTab('settings');
       focusEngine.setFocus('settings', 0);
+      setTimeout(dismissSplash, 500);
     } else {
       focusEngine.setFocus('topBar', 0);
+
+      // Intelligent boot warming:
+      // Minimum display time (800ms) prevents abrupt flicker on fast connections.
+      // Maximum safety ceiling (3000ms) guarantees the splash screen NEVER hangs.
+      const minDisplayPromise = new Promise<void>((resolve) => setTimeout(resolve, 800));
+      const safetyTimeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 3000));
+
+      const prefetchPromise = Promise.allSettled([
+        prefetchHomeData(),
+        prefetchAlbums(),
+      ]);
+
+      Promise.race([
+        Promise.all([minDisplayPromise, prefetchPromise]),
+        safetyTimeoutPromise,
+      ]).then(() => {
+        dismissSplash();
+      });
     }
 
     window.addEventListener('keydown', focusEngine.handleKeyDown);

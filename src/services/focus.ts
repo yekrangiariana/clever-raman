@@ -348,7 +348,7 @@ function createFocusEngine() {
       if (index > 0) {
         setFocus('nowPlayingQueue', index - 1);
       } else {
-        setFocus('nowPlaying', 6);
+        setFocus('nowPlaying', 7);
       }
     } else if (section === 'nowPlayingQueue_remove') {
       const prevBtn = document.querySelector(`[data-section="nowPlayingQueue_remove"][data-index="${index - 1}"]`);
@@ -545,7 +545,7 @@ function createFocusEngine() {
     } else if (section === 'nowPlaying') {
       if (index > 0) setFocus('nowPlaying', index - 1);
     } else if (section === 'nowPlayingQueue') {
-      setFocus('nowPlaying', 6);
+      setFocus('nowPlaying', 7);
     } else if (section === 'nowPlayingQueue_remove') {
       setFocus('nowPlayingQueue', index);
     } else if (section.endsWith('_heart')) {
@@ -620,7 +620,7 @@ function createFocusEngine() {
         setFocus('albumDetail', index + 1);
       }
     } else if (section === 'nowPlaying') {
-      if (index === 6) {
+      if (index === 7) {
         const queueElem = document.querySelector('[data-section="nowPlayingQueue"]');
         if (queueElem) setFocus('nowPlayingQueue', 0);
       } else if (index < totalCount - 1) {
@@ -631,10 +631,10 @@ function createFocusEngine() {
       if (removeBtn) {
         setFocus('nowPlayingQueue_remove' as FocusSection, index);
       } else {
-        setFocus('nowPlaying', 6);
+        setFocus('nowPlaying', 7);
       }
     } else if (section === 'nowPlayingQueue_remove') {
-      setFocus('nowPlaying', 6);
+      setFocus('nowPlaying', 7);
     } else if (section.endsWith('_queue')) {
       const heartSection = section.replace('_queue', '_heart') as FocusSection;
       const heartBtn = document.querySelector(`[data-section="${heartSection}"][data-index="${index}"]`);
@@ -706,7 +706,7 @@ function createFocusEngine() {
       return;
     }
     if (currentLocation().section === 'nowPlayingQueue') {
-      setFocus('nowPlaying', 6);
+      setFocus('nowPlaying', 7);
       return;
     }
     if (modal === 'nowPlaying') {

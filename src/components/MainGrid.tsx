@@ -34,6 +34,21 @@ function setAlbumCache(key: string, list: Album[]) {
   albumCache.set(key, list);
 }
 
+export async function prefetchAlbums(): Promise<void> {
+  if (!api.isConfigured()) return;
+  const cacheKey = 'all_alphabeticalByName_500';
+  if (albumCache.has(cacheKey) && albumCache.get(cacheKey)!.length > 0) return;
+
+  try {
+    const list = await api.getAlbumList('alphabeticalByName', 500, 0);
+    if (list && list.length > 0) {
+      setAlbumCache(cacheKey, list);
+    }
+  } catch (e) {
+    console.warn('Background album prefetch failed', e);
+  }
+}
+
 export const MainGrid: Component<MainGridProps> = (props) => {
   const [currentFilter, setCurrentFilter] = createSignal<AlbumSortFilter>('alphabeticalByName');
 

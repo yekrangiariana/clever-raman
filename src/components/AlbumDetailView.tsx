@@ -86,7 +86,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
       focusEngine.setActiveModal('nowPlaying');
       focusEngine.setFocus('nowPlaying', 2);
     } else {
-      audioPlayer.playTrack(song, [song], 0);
+      audioPlayer.playTrack(allSongs[index], allSongs, index);
     }
   }
 
@@ -130,8 +130,8 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
   const isAlbumInQueue = createMemo(() => {
     const songs = data()?.songs;
     if (!songs || songs.length === 0) return false;
-    const q = audioPlayer.queue();
-    return songs.every((s) => q.some((item) => item.id === s.id));
+    const uq = audioPlayer.userQueue();
+    return songs.every((s) => uq.some((item) => item.id === s.id));
   });
 
   const handleAlbumQueueClick = () => {
@@ -141,7 +141,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
       const ids = new Set(songs.map((s) => s.id));
       audioPlayer.removeSongsFromQueue(ids);
     } else {
-      audioPlayer.addToQueue(songs);
+      audioPlayer.addToUserQueue(songs, false, false);
     }
   };
 

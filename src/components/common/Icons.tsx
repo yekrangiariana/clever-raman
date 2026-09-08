@@ -268,3 +268,57 @@ export const EqualizerIcon: Component<IconProps> = (props) => (
     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" />
   </svg>
 );
+
+/**
+ * Repeat / Loop Icon
+ */
+export const RepeatIcon: Component<IconProps> = (props) => (
+  <svg
+    class={props.class || "w-6 h-6"}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M17 1l4 4-4 4" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <path d="M7 23l-4-4 4-4" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+  </svg>
+);
+
+/**
+ * Repeat One Icon (Loop single track)
+ */
+export const RepeatOneIcon: Component<IconProps> = (props) => (
+  <svg
+    class={props.class || "w-6 h-6"}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M17 1l4 4-4 4" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <path d="M7 23l-4-4 4-4" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+    <text
+      x="12"
+      y="14.5"
+      fill="currentColor"
+      stroke="none"
+      font-size="8"
+      font-weight="bold"
+      font-family="sans-serif"
+      text-anchor="middle"
+      dominant-baseline="central"
+    >
+      1
+    </text>
+  </svg>
+);
+

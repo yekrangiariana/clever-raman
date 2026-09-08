@@ -2,7 +2,20 @@ import { Component, createMemo, createSignal, For, Show } from 'solid-js';
 import { audioPlayer } from '../services/audio';
 import { api, Song } from '../services/api';
 import { focusEngine } from '../services/focus';
-import { PlayIcon, PauseIcon, SkipNextIcon, SkipPrevIcon, ShuffleIcon, HeartIcon, QueueListIcon, TrashIcon, ArrowLeftIcon, MusicNoteIcon } from './common/Icons';
+import {
+  PlayIcon,
+  PauseIcon,
+  SkipNextIcon,
+  SkipPrevIcon,
+  ShuffleIcon,
+  RepeatIcon,
+  RepeatOneIcon,
+  HeartIcon,
+  QueueListIcon,
+  TrashIcon,
+  ArrowLeftIcon,
+  MusicNoteIcon,
+} from './common/Icons';
 
 interface NowPlayingViewProps {
   onBack?: () => void;
@@ -35,14 +48,17 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
     return Math.min(100, Math.max(0, (cur / dur) * 100));
   });
 
-  const queue = () => audioPlayer.queue();
-  const queueIndex = () => audioPlayer.queueIndex();
+  const userQueue = () => audioPlayer.userQueue();
+  const contextQueue = () => audioPlayer.contextQueue();
+  const contextIndex = () => audioPlayer.contextIndex();
 
-  const upcomingCount = () => {
-    const q = queue();
-    const idx = queueIndex();
-    return Math.max(0, q.length - 1 - idx);
-  };
+  const upcomingContext = createMemo(() => {
+    const cq = contextQueue();
+    const cIdx = contextIndex();
+    return cIdx < cq.length - 1 ? cq.slice(cIdx + 1) : [];
+  });
+
+  const hasClear = createMemo(() => userQueue().length > 0);
 
   async function handleToggleStar() {
     const t = track();
@@ -53,23 +69,6 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
       await api.star(t.id, false);
     } else {
       await api.unstar(t.id, false);
-    }
-  }
-
-  function handleRemoveFromQueue(idx: number, e: Event) {
-    e.stopPropagation();
-    const currentLen = queue().length;
-    audioPlayer.removeFromQueue(idx);
-    const remLen = currentLen - 1;
-    if (remLen <= 0) {
-      setShowQueue(false);
-      focusEngine.setFocus('nowPlaying', 6);
-    } else {
-      const targetIdx = Math.min(idx, remLen - 1);
-      const focusIdx = remLen > 1 ? targetIdx + 1 : targetIdx;
-      setTimeout(() => {
-        focusEngine.setFocus('nowPlayingQueue_remove', focusIdx);
-      }, 50);
     }
   }
 
@@ -87,10 +86,36 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
     setShowQueue(next);
     if (next) {
       setTimeout(() => {
-        focusEngine.setFocus('nowPlayingQueue', queue().length > 1 ? 0 : 1);
+        focusEngine.setFocus('nowPlayingQueue', 0);
       }, 50);
     } else {
-      focusEngine.setFocus('nowPlaying', 6);
+      focusEngine.setFocus('nowPlaying', 7);
+    }
+  }
+
+  function handleClearUserQueue() {
+    audioPlayer.clearUserQueue();
+    setTimeout(() => {
+      const firstItem = document.querySelector('[data-section="nowPlayingQueue"][data-index="0"]');
+      if (firstItem) {
+        focusEngine.setFocus('nowPlayingQueue', 0);
+      } else {
+        focusEngine.setFocus('nowPlaying', 7);
+      }
+    }, 50);
+  }
+
+  function handleRemoveUserQueueItem(idx: number, e: Event) {
+    e.stopPropagation();
+    audioPlayer.removeFromUserQueueByIndex(idx);
+  }
+
+  function handleRemoveContextItem(relIdx: number, e: Event) {
+    e.stopPropagation();
+    const cq = contextQueue();
+    const actualIdx = contextIndex() + 1 + relIdx;
+    if (actualIdx >= 0 && actualIdx < cq.length) {
+      audioPlayer.removeSongsFromQueue(new Set([cq[actualIdx].id]));
     }
   }
 
@@ -191,8 +216,27 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               data-focusable="true"
               data-section="nowPlaying"
               data-index="4"
+              title="Shuffle"
             >
               <ShuffleIcon class="w-7 h-7" />
+            </button>
+
+            {/* Repeat Toggle */}
+            <button
+              onClick={() => audioPlayer.toggleRepeatMode()}
+              class={`w-14 h-14 rounded-full flex items-center justify-center border transition-all ${
+                audioPlayer.repeatMode() !== 'off' ? 'text-black bg-white border-white shadow-lg' : 'text-neutral-400 bg-neutral-900/60 border-neutral-800 hover:text-white'
+              }`}
+              data-focusable="true"
+              data-section="nowPlaying"
+              data-index="5"
+              title={`Repeat: ${audioPlayer.repeatMode()}`}
+            >
+              {audioPlayer.repeatMode() === 'one' ? (
+                <RepeatOneIcon class="w-7 h-7" />
+              ) : (
+                <RepeatIcon class="w-7 h-7" />
+              )}
             </button>
 
             {/* Star Button */}
@@ -203,7 +247,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               }`}
               data-focusable="true"
               data-section="nowPlaying"
-              data-index="5"
+              data-index="6"
             >
               <HeartIcon filled={isStarred()} class="w-7 h-7" />
             </button>
@@ -216,22 +260,22 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               }`}
               data-focusable="true"
               data-section="nowPlaying"
-              data-index="6"
+              data-index="7"
               title="Up Next Queue"
             >
               <QueueListIcon class="w-7 h-7" />
-              {upcomingCount() > 0 && (
+              {audioPlayer.upcomingCount() > 0 && (
                 <span class={`absolute -top-2 -right-2 px-2.5 py-0.5 min-w-[28px] rounded-full text-base font-black leading-none flex items-center justify-center shadow-lg border border-black/20 ${
                   showQueue() ? 'bg-black text-white' : 'bg-white text-black'
                 }`}>
-                  {upcomingCount()}
+                  {audioPlayer.upcomingCount()}
                 </span>
               )}
             </button>
           </div>
         </div>
 
-        {/* Right Side: 50% Full-Height Up Next Stage (Matching Apple TV Reference Screenshot) */}
+        {/* Right Side: 50% Full-Height Up Next Stage (Single Unified Column) */}
         <Show when={showQueue()}>
           <div class="w-1/2 h-[640px] flex flex-col justify-start pl-8 pr-4 min-h-0 animate-fade-in">
             {/* Section Header */}
@@ -239,15 +283,15 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               <h2 class="text-4xl font-black text-white tracking-tight">Up Next</h2>
 
               <div class="flex items-center gap-3">
-                {queue().length > 1 && (
+                {hasClear() && (
                   <button
-                    onClick={() => audioPlayer.clearQueue()}
+                    onClick={handleClearUserQueue}
                     class="px-5 py-2 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-300 hover:text-white text-base font-extrabold transition-all"
                     data-focusable="true"
                     data-section="nowPlayingQueue"
                     data-index="0"
                   >
-                    Clear All
+                    Clear
                   </button>
                 )}
               </div>
@@ -258,26 +302,66 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
 
             {/* Queue Scrollable List */}
             <div class="flex-1 overflow-y-auto flex flex-col gap-1.5 pr-2">
-              <For each={queue()}>
-                {(song, index) => {
-                  const isPlaying = () => index() === queueIndex();
-                  const focusIndex = () => (queue().length > 1 ? index() + 1 : index());
+              {/* 1. Currently Playing Track at Top */}
+              <Show when={track()}>
+                {(() => {
+                  const currentFocusIndex = hasClear() ? 1 : 0;
                   return (
                     <div class="flex flex-col w-full">
                       <div
-                        onClick={() => audioPlayer.jumpToQueueIndex(index())}
-                        class={`h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative ${
-                          isPlaying()
-                            ? 'bg-white text-black font-extrabold shadow-xl scale-[1.01]'
-                            : 'bg-transparent text-neutral-200 hover:bg-neutral-800/60'
-                        }`}
+                        class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-white text-black font-extrabold shadow-xl scale-[1.01]"
                         data-focusable="true"
                         data-variant="list"
                         data-section="nowPlayingQueue"
-                        data-index={focusIndex()}
+                        data-index={currentFocusIndex}
                       >
                         <div class="flex items-center gap-5 truncate flex-1 min-w-0">
-                          {/* Album Artwork Thumbnail */}
+                          <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
+                            {coverUrl() ? (
+                              <img src={coverUrl()} alt={track()!.title} class="w-full h-full object-cover" />
+                            ) : (
+                              <div class="w-full h-full flex items-center justify-center text-neutral-600">
+                                <MusicNoteIcon class="w-8 h-8" />
+                              </div>
+                            )}
+                          </div>
+
+                          <span class="w-3.5 h-3.5 rounded-full bg-black inline-block animate-pulse play-indicator shrink-0 mr-1" />
+
+                          <div class="flex flex-col truncate min-w-0 flex-1">
+                            <span class="text-2xl font-extrabold truncate leading-snug">{track()!.title}</span>
+                            <span class="text-lg truncate font-medium text-neutral-700">{track()!.artist}</span>
+                          </div>
+                        </div>
+
+                        <div class="flex items-center gap-6 shrink-0 ml-4">
+                          <span class="font-mono text-xl font-medium text-black">
+                            {formatDuration(track()!.duration || audioPlayer.duration())}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="w-full h-px bg-white/10 my-0.5" />
+                    </div>
+                  );
+                })()}
+              </Show>
+
+              {/* 2. Manually Added User Queue Items */}
+              <For each={userQueue()}>
+                {(song, uqIndex) => {
+                  const baseIdx = (hasClear() ? 1 : 0) + 1; // 1 after current track
+                  const itemFocusIndex = baseIdx + uqIndex();
+                  return (
+                    <div class="flex flex-col w-full">
+                      <div
+                        onClick={() => audioPlayer.jumpToUserQueueIndex(uqIndex())}
+                        class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-transparent text-neutral-200 hover:bg-neutral-800/60"
+                        data-focusable="true"
+                        data-variant="list"
+                        data-section="nowPlayingQueue"
+                        data-index={itemFocusIndex}
+                      >
+                        <div class="flex items-center gap-5 truncate flex-1 min-w-0">
                           <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
                             {song.coverArt || song.id ? (
                               <img
@@ -292,47 +376,120 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                             )}
                           </div>
 
-                          {/* Track Number */}
-                          <span class={`font-mono text-3xl font-black shrink-0 ${isPlaying() ? 'text-black' : 'text-neutral-400'}`}>
-                            {index() + 1}.
+                          <span class="font-mono text-xl font-black text-emerald-400 shrink-0">
+                            •
                           </span>
 
-                          {/* Title & Artist */}
                           <div class="flex flex-col truncate min-w-0 flex-1">
                             <span class="text-2xl font-extrabold truncate leading-snug">{song.title}</span>
-                            <span class={`text-lg truncate font-medium ${isPlaying() ? 'text-neutral-700' : 'text-neutral-400'}`}>
-                              {song.artist}
-                            </span>
+                            <span class="text-lg truncate font-medium text-neutral-400">{song.artist}</span>
                           </div>
                         </div>
 
-                        {/* Duration & Remove Button */}
                         <div class="flex items-center gap-6 shrink-0 ml-4">
-                          <span class={`font-mono text-xl font-medium ${isPlaying() ? 'text-black' : 'text-neutral-400'}`}>
+                          <span class="font-mono text-xl font-medium text-neutral-400">
                             {formatDuration(song.duration)}
                           </span>
-                          {!isPlaying() && (
-                            <button
-                              onClick={(e) => handleRemoveFromQueue(index(), e)}
-                              class="p-2.5 rounded-full text-neutral-400 hover:text-white transition-all flex items-center justify-center shrink-0"
-                              data-focusable="true"
-                              data-variant="topPick"
-                              data-section="nowPlayingQueue_remove"
-                              data-index={focusIndex()}
-                              title="Remove"
-                            >
-                              <TrashIcon class="w-5 h-5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={(e) => handleRemoveUserQueueItem(uqIndex(), e)}
+                            class="p-2.5 rounded-full text-neutral-400 hover:text-white transition-all flex items-center justify-center shrink-0"
+                            data-focusable="true"
+                            data-variant="topPick"
+                            data-section="nowPlayingQueue_remove"
+                            data-index={itemFocusIndex}
+                            title="Remove"
+                          >
+                            <TrashIcon class="w-5 h-5" />
+                          </button>
                         </div>
                       </div>
-
-                      {/* Thin horizontal divider line between rows */}
                       <div class="w-full h-px bg-white/10 my-0.5" />
                     </div>
                   );
                 }}
               </For>
+
+              {/* 3. Subtle Context Separator (Apple Music style) */}
+              <Show when={userQueue().length > 0 && upcomingContext().length > 0}>
+                <div class="flex items-center gap-4 my-3 px-3">
+                  <div class="h-px bg-white/15 flex-1" />
+                  <span class="text-xs font-bold tracking-wider text-neutral-400 uppercase">
+                    Continuing from {track()?.album || track()?.artist || 'Collection'}
+                  </span>
+                  <div class="h-px bg-white/15 flex-1" />
+                </div>
+              </Show>
+
+              {/* 4. Upcoming Context Queue Items */}
+              <For each={upcomingContext()}>
+                {(song, relIndex) => {
+                  const baseIdx = (hasClear() ? 1 : 0) + 1 + userQueue().length;
+                  const itemFocusIndex = baseIdx + relIndex();
+                  const actualContextIndex = contextIndex() + 1 + relIndex();
+                  return (
+                    <div class="flex flex-col w-full">
+                      <div
+                        onClick={() => audioPlayer.jumpToContextIndex(actualContextIndex)}
+                        class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-transparent text-neutral-200 hover:bg-neutral-800/60"
+                        data-focusable="true"
+                        data-variant="list"
+                        data-section="nowPlayingQueue"
+                        data-index={itemFocusIndex}
+                      >
+                        <div class="flex items-center gap-5 truncate flex-1 min-w-0">
+                          <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
+                            {song.coverArt || song.id ? (
+                              <img
+                                src={api.getCoverArtUrl(song.coverArt || song.id, 300)}
+                                alt={song.title}
+                                class="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div class="w-full h-full flex items-center justify-center text-neutral-600">
+                                <MusicNoteIcon class="w-8 h-8" />
+                              </div>
+                            )}
+                          </div>
+
+                          <span class="font-mono text-2xl font-black text-neutral-500 shrink-0">
+                            {song.track || actualContextIndex + 1}.
+                          </span>
+
+                          <div class="flex flex-col truncate min-w-0 flex-1">
+                            <span class="text-2xl font-extrabold truncate leading-snug">{song.title}</span>
+                            <span class="text-lg truncate font-medium text-neutral-400">{song.artist}</span>
+                          </div>
+                        </div>
+
+                        <div class="flex items-center gap-6 shrink-0 ml-4">
+                          <span class="font-mono text-xl font-medium text-neutral-400">
+                            {formatDuration(song.duration)}
+                          </span>
+                          <button
+                            onClick={(e) => handleRemoveContextItem(relIndex(), e)}
+                            class="p-2.5 rounded-full text-neutral-400 hover:text-white transition-all flex items-center justify-center shrink-0"
+                            data-focusable="true"
+                            data-variant="topPick"
+                            data-section="nowPlayingQueue_remove"
+                            data-index={itemFocusIndex}
+                            title="Remove"
+                          >
+                            <TrashIcon class="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div class="w-full h-px bg-white/10 my-0.5" />
+                    </div>
+                  );
+                }}
+              </For>
+
+              {/* Empty Queue State */}
+              <Show when={userQueue().length === 0 && upcomingContext().length === 0 && !track()}>
+                <div class="flex flex-col items-center justify-center py-16 text-neutral-500">
+                  <p class="text-2xl font-bold">No upcoming tracks</p>
+                </div>
+              </Show>
             </div>
           </div>
         </Show>

@@ -128,6 +128,7 @@ class SubsonicApi {
 
   public clearConfig(): void {
     this.config = null;
+    this.clearDetailsCache();
     localStorage.removeItem(STORAGE_KEY);
   }
 
@@ -293,20 +294,51 @@ class SubsonicApi {
     }
   }
 
+  private albumDetailsCache = new Map<string, { album: Album; songs: Song[] }>();
+  private playlistDetailsCache = new Map<string, { playlist: Playlist; songs: Song[] }>();
+
+  public clearDetailsCache(): void {
+    this.albumDetailsCache.clear();
+    this.playlistDetailsCache.clear();
+  }
+
   /**
-   * Get album tracks (getAlbum.view)
+   * Get album tracks (getAlbum.view) with in-memory LRU caching
    */
   public async getAlbum(id: string): Promise<{ album: Album; songs: Song[] }> {
+    if (this.albumDetailsCache.has(id)) {
+      return this.albumDetailsCache.get(id)!;
+    }
+
     const res = await this.request<{ album?: Album & { song?: Song[] } }>('getAlbum.view', { id });
     const albumData = res.album;
     if (!albumData) {
       throw new Error('Album not found');
     }
     const songs = albumData.song || [];
-    return {
+    const result = {
       album: albumData,
       songs,
     };
+
+    if (this.albumDetailsCache.size >= 30) {
+      const firstKey = this.albumDetailsCache.keys().next().value;
+      if (firstKey) this.albumDetailsCache.delete(firstKey);
+    }
+    this.albumDetailsCache.set(id, result);
+
+    return result;
+  }
+
+  /**
+   * Pre-warm album details in the background
+   */
+  public async prefetchAlbumDetails(ids: string[]): Promise<void> {
+    const uncachedIds = ids.filter((id) => !this.albumDetailsCache.has(id));
+    for (let i = 0; i < uncachedIds.length; i += 3) {
+      const batch = uncachedIds.slice(i, i + 3);
+      await Promise.allSettled(batch.map((id) => this.getAlbum(id)));
+    }
   }
 
   /**
@@ -318,13 +350,36 @@ class SubsonicApi {
   }
 
   /**
-   * Get playlist details and tracks (getPlaylist.view)
+   * Get playlist details and tracks (getPlaylist.view) with in-memory LRU caching
    */
   public async getPlaylist(id: string): Promise<{ playlist: Playlist; songs: Song[] }> {
+    if (this.playlistDetailsCache.has(id)) {
+      return this.playlistDetailsCache.get(id)!;
+    }
+
     const res = await this.request<{ playlist?: Playlist & { entry?: Song[] } }>('getPlaylist.view', { id });
     const pl = res.playlist;
     if (!pl) throw new Error('Playlist not found');
-    return { playlist: pl, songs: pl.entry || [] };
+    const result = { playlist: pl, songs: pl.entry || [] };
+
+    if (this.playlistDetailsCache.size >= 15) {
+      const firstKey = this.playlistDetailsCache.keys().next().value;
+      if (firstKey) this.playlistDetailsCache.delete(firstKey);
+    }
+    this.playlistDetailsCache.set(id, result);
+
+    return result;
+  }
+
+  /**
+   * Pre-warm playlist details in the background
+   */
+  public async prefetchPlaylistDetails(ids: string[]): Promise<void> {
+    const uncachedIds = ids.filter((id) => !this.playlistDetailsCache.has(id));
+    for (let i = 0; i < uncachedIds.length; i += 2) {
+      const batch = uncachedIds.slice(i, i + 2);
+      await Promise.allSettled(batch.map((id) => this.getPlaylist(id)));
+    }
   }
 
   /**

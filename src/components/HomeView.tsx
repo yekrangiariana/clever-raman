@@ -29,6 +29,103 @@ export function clearHomeCache() {
   cachedHomeData = null;
 }
 
+export async function prefetchHomeData(): Promise<HomeData | null> {
+  if (!api.isConfigured()) return null;
+  if (cachedHomeData) return cachedHomeData;
+
+  try {
+    const [newestRes, starredRes, starred2Res, randomRes, genresRes, playlistsRes] = await Promise.allSettled([
+      api.getAlbumList('newest', 40),
+      api.getAlbumList('starred', 40),
+      api.getStarred2(),
+      api.getAlbumList('random', 40),
+      api.getGenres(),
+      api.getPlaylists(),
+    ]);
+
+    const newestRaw = newestRes.status === 'fulfilled' ? newestRes.value : [];
+    let starredRaw = starredRes.status === 'fulfilled' ? starredRes.value : [];
+    const starred2Data = starred2Res.status === 'fulfilled' ? starred2Res.value : { albums: [], songs: [] };
+    if (starredRaw.length === 0 && starred2Data.albums.length > 0) {
+      starredRaw = starred2Data.albums;
+    }
+
+    const MAX_ITEMS = 20;
+    const starredTracks = starred2Data.songs.slice(0, MAX_ITEMS);
+    const randomRaw = randomRes.status === 'fulfilled' ? randomRes.value : [];
+    const genres = genresRes.status === 'fulfilled' ? genresRes.value : [];
+    const playlists = playlistsRes.status === 'fulfilled' ? playlistsRes.value : [];
+
+    // High performance O(1) deduplication across Home screen sections
+    const seenAlbumIds = new Set<string>();
+
+    const starred: Album[] = [];
+    starredRaw.forEach((album) => {
+      if (!seenAlbumIds.has(album.id) && starred.length < MAX_ITEMS) {
+        seenAlbumIds.add(album.id);
+        starred.push(album);
+      }
+    });
+
+    let newest: Album[] = [];
+    newestRaw.forEach((album) => {
+      if (!seenAlbumIds.has(album.id) && newest.length < MAX_ITEMS) {
+        seenAlbumIds.add(album.id);
+        newest.push(album);
+      }
+    });
+
+    let random: Album[] = [];
+    randomRaw.forEach((album) => {
+      if (!seenAlbumIds.has(album.id) && random.length < MAX_ITEMS) {
+        seenAlbumIds.add(album.id);
+        random.push(album);
+      }
+    });
+
+    if (newest.length === 0 && random.length === 0) {
+      const fallbackAlbums = await api.getAlbumList('alphabeticalByName', 40);
+      fallbackAlbums.forEach((album) => {
+        if (!seenAlbumIds.has(album.id)) {
+          seenAlbumIds.add(album.id);
+          if (newest.length < 20) newest.push(album);
+          else if (random.length < 20) random.push(album);
+        }
+      });
+    }
+
+    cachedHomeData = {
+      newest,
+      starred,
+      starredTracks,
+      random,
+      genres,
+      playlists,
+    };
+
+    // Silently pre-warm top album and playlist tracklists in the background
+    // (runs asynchronously so it never blocks or delays the splash screen)
+    setTimeout(() => {
+      const topAlbumIds = [
+        ...newest.slice(0, 5).map((a) => a.id),
+        ...starred.slice(0, 3).map((a) => a.id),
+      ];
+      if (topAlbumIds.length > 0) {
+        api.prefetchAlbumDetails(topAlbumIds);
+      }
+      const topPlaylistIds = playlists.slice(0, 4).map((p) => p.id);
+      if (topPlaylistIds.length > 0) {
+        api.prefetchPlaylistDetails(topPlaylistIds);
+      }
+    }, 100);
+
+    return cachedHomeData;
+  } catch (e) {
+    console.error('Failed to load Home data', e);
+    return null;
+  }
+}
+
 export const HomeView: Component<HomeViewProps> = (props) => {
   let mainContainerRef: HTMLElement | undefined;
 
@@ -41,86 +138,8 @@ export const HomeView: Component<HomeViewProps> = (props) => {
     if (!configured) {
       return { newest: [], starred: [], starredTracks: [], random: [], genres: [], playlists: [] };
     }
-
-    if (cachedHomeData) {
-      return cachedHomeData;
-    }
-
-    try {
-      const [newestRes, starredRes, starred2Res, randomRes, genresRes, playlistsRes] = await Promise.allSettled([
-        api.getAlbumList('newest', 40),
-        api.getAlbumList('starred', 40),
-        api.getStarred2(),
-        api.getAlbumList('random', 40),
-        api.getGenres(),
-        api.getPlaylists(),
-      ]);
-
-      const newestRaw = newestRes.status === 'fulfilled' ? newestRes.value : [];
-      let starredRaw = starredRes.status === 'fulfilled' ? starredRes.value : [];
-      const starred2Data = starred2Res.status === 'fulfilled' ? starred2Res.value : { albums: [], songs: [] };
-      if (starredRaw.length === 0 && starred2Data.albums.length > 0) {
-        starredRaw = starred2Data.albums;
-      }
-
-      const MAX_ITEMS = 20;
-      const starredTracks = starred2Data.songs.slice(0, MAX_ITEMS);
-      const randomRaw = randomRes.status === 'fulfilled' ? randomRes.value : [];
-      const genres = genresRes.status === 'fulfilled' ? genresRes.value : [];
-      const playlists = playlistsRes.status === 'fulfilled' ? playlistsRes.value : [];
-
-      // High performance O(1) deduplication across Home screen sections
-      const seenAlbumIds = new Set<string>();
-
-      const starred: Album[] = [];
-      starredRaw.forEach((album) => {
-        if (!seenAlbumIds.has(album.id) && starred.length < MAX_ITEMS) {
-          seenAlbumIds.add(album.id);
-          starred.push(album);
-        }
-      });
-
-      let newest: Album[] = [];
-      newestRaw.forEach((album) => {
-        if (!seenAlbumIds.has(album.id) && newest.length < MAX_ITEMS) {
-          seenAlbumIds.add(album.id);
-          newest.push(album);
-        }
-      });
-
-      let random: Album[] = [];
-      randomRaw.forEach((album) => {
-        if (!seenAlbumIds.has(album.id) && random.length < MAX_ITEMS) {
-          seenAlbumIds.add(album.id);
-          random.push(album);
-        }
-      });
-
-      if (newest.length === 0 && random.length === 0) {
-        const fallbackAlbums = await api.getAlbumList('alphabeticalByName', 40);
-        fallbackAlbums.forEach((album) => {
-          if (!seenAlbumIds.has(album.id)) {
-            seenAlbumIds.add(album.id);
-            if (newest.length < 20) newest.push(album);
-            else if (random.length < 20) random.push(album);
-          }
-        });
-      }
-
-      cachedHomeData = {
-        newest,
-        starred,
-        starredTracks,
-        random,
-        genres,
-        playlists,
-      };
-
-      return cachedHomeData;
-    } catch (e) {
-      console.error('Failed to load Home data', e);
-      return { newest: [], starred: [], starredTracks: [], random: [], genres: [], playlists: [] };
-    }
+    const data = await prefetchHomeData();
+    return data || { newest: [], starred: [], starredTracks: [], random: [], genres: [], playlists: [] };
   });
 
   createEffect(() => {

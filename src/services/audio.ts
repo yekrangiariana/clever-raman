@@ -1,14 +1,18 @@
-import { createSignal, createRoot } from 'solid-js';
+import { createSignal, createRoot, createMemo } from 'solid-js';
 import { api, Song } from './api';
+
+export type RepeatMode = 'off' | 'all' | 'one';
 
 export interface PlaybackState {
   currentTrack: Song | null;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
-  queue: Song[];
-  queueIndex: number;
+  contextQueue: Song[];
+  contextIndex: number;
+  userQueue: Song[];
   isShuffle: boolean;
+  repeatMode: RepeatMode;
 }
 
 function createAudioPlayer() {
@@ -19,10 +23,43 @@ function createAudioPlayer() {
   const [isPlaying, setIsPlaying] = createSignal<boolean>(false);
   const [currentTime, setCurrentTime] = createSignal<number>(0);
   const [duration, setDuration] = createSignal<number>(0);
-  const [queue, setQueue] = createSignal<Song[]>([]);
-  const [originalQueue, setOriginalQueue] = createSignal<Song[]>([]);
-  const [queueIndex, setQueueIndex] = createSignal<number>(0);
+
+  // Layer 1: Context Queue (Album or Playlist)
+  const [contextQueue, setContextQueue] = createSignal<Song[]>([]);
+  const [originalContextQueue, setOriginalContextQueue] = createSignal<Song[]>([]);
+  const [contextIndex, setContextIndex] = createSignal<number>(0);
+
+  // Layer 2: User Queue (Explicitly queued songs by user)
+  const [userQueue, setUserQueue] = createSignal<Song[]>([]);
+
+  // Playback modes
   const [isShuffle, setIsShuffle] = createSignal<boolean>(false);
+  const [repeatMode, setRepeatMode] = createSignal<RepeatMode>('off');
+
+  // Unified derived upcoming count: manual songs + upcoming songs in context
+  const upcomingCount = createMemo(() => {
+    const uqLen = userQueue().length;
+    const cqLen = contextQueue().length;
+    const cIdx = contextIndex();
+    const remainingContext = Math.max(0, cqLen - 1 - cIdx);
+    return uqLen + remainingContext;
+  });
+
+  // Flat queue representation for components that need a combined view
+  const queue = createMemo(() => {
+    const curr = currentTrack();
+    const uq = userQueue();
+    const cq = contextQueue();
+    const cIdx = contextIndex();
+    const upcomingContext = cIdx < cq.length - 1 ? cq.slice(cIdx + 1) : [];
+    return [
+      ...(curr ? [curr] : []),
+      ...uq,
+      ...upcomingContext,
+    ];
+  });
+
+  const queueIndex = createMemo(() => 0); // Current track is always first in active derived queue
 
   audio.addEventListener('timeupdate', () => {
     setCurrentTime(audio.currentTime || 0);
@@ -43,16 +80,7 @@ function createAudioPlayer() {
   });
 
   audio.addEventListener('ended', () => {
-    const q = queue();
-    const currIdx = queueIndex();
-    if (currIdx + 1 < q.length) {
-      nextTrack();
-    } else {
-      setIsPlaying(false);
-      audio.currentTime = 0;
-      setCurrentTime(0);
-      updateMediaSessionPlaybackState('none');
-    }
+    playNextInHierarchy(false);
   });
 
   audio.addEventListener('error', (e) => {
@@ -102,69 +130,139 @@ function createAudioPlayer() {
   }
 
   function toggleShuffle() {
-    const newShuffle = !isShuffle();
-    setIsShuffle(newShuffle);
+    const nextShuffle = !isShuffle();
+    setIsShuffle(nextShuffle);
 
-    const orig = originalQueue();
+    const orig = originalContextQueue();
     if (orig.length > 0) {
-      if (newShuffle) {
-        const shuffled = shuffleArray(orig);
+      if (nextShuffle) {
         const curr = currentTrack();
-        if (curr) {
-          // Keep current track first in queue
-          const filtered = shuffled.filter(s => s.id !== curr.id);
-          const finalQueue = [curr, ...filtered];
-          setQueue(finalQueue);
-          setQueueIndex(0);
-        } else {
-          setQueue(shuffled);
-        }
+        const remaining = orig.filter((s) => s.id !== curr?.id);
+        const shuffled = shuffleArray(remaining);
+        const newQueue = curr ? [curr, ...shuffled] : shuffled;
+        setContextQueue(newQueue);
+        setContextIndex(0);
       } else {
-        setQueue(orig);
+        setContextQueue(orig);
         const curr = currentTrack();
         if (curr) {
-          const idx = orig.findIndex(s => s.id === curr.id);
-          setQueueIndex(idx >= 0 ? idx : 0);
+          const idx = orig.findIndex((s) => s.id === curr.id);
+          setContextIndex(idx >= 0 ? idx : 0);
         }
       }
     }
+    showToast(nextShuffle ? 'Shuffle On' : 'Shuffle Off');
   }
 
-  function playTrack(track: Song, trackQueue?: Song[], index?: number) {
-    if (trackQueue && trackQueue.length > 0) {
-      setOriginalQueue([...trackQueue]);
-      if (isShuffle()) {
-        const shuffled = shuffleArray(trackQueue);
-        const filtered = shuffled.filter(s => s.id !== track.id);
-        const finalQueue = [track, ...filtered];
-        setQueue(finalQueue);
-        setQueueIndex(0);
-      } else {
-        setQueue([...trackQueue]);
-        setQueueIndex(index ?? trackQueue.findIndex((s) => s.id === track.id));
-      }
-    } else if (queue().length === 0) {
-      setOriginalQueue([track]);
-      setQueue([track]);
-      setQueueIndex(0);
+  function toggleRepeatMode() {
+    const current = repeatMode();
+    let next: RepeatMode = 'off';
+    let label = 'Repeat Off';
+    if (current === 'off') {
+      next = 'all';
+      label = 'Repeat All';
+    } else if (current === 'all') {
+      next = 'one';
+      label = 'Repeat One';
+    } else {
+      next = 'off';
+      label = 'Repeat Off';
     }
+    setRepeatMode(next);
+    showToast(label);
+  }
 
+  function startPlaybackStream(track: Song) {
     setCurrentTrack(track);
     const streamUrl = api.getStreamUrl(track.id);
     audio.src = streamUrl;
     audio.play().catch((err) => {
       console.error('Failed to start audio playback', err);
     });
-
     updateMediaSessionMetadata(track);
+  }
+
+  /**
+   * Starts playback of a track with collection context.
+   * If `collection` is supplied, sets the active Context Queue.
+   * Clears user queue for fresh album playback.
+   */
+  function playTrack(track: Song, collection?: Song[], index?: number) {
+    if (collection && collection.length > 0) {
+      setOriginalContextQueue([...collection]);
+      if (isShuffle()) {
+        const remaining = collection.filter((s) => s.id !== track.id);
+        const shuffled = [track, ...shuffleArray(remaining)];
+        setContextQueue(shuffled);
+        setContextIndex(0);
+      } else {
+        setContextQueue([...collection]);
+        const targetIdx = index ?? collection.findIndex((s) => s.id === track.id);
+        setContextIndex(targetIdx >= 0 ? targetIdx : 0);
+      }
+    } else {
+      setOriginalContextQueue([track]);
+      setContextQueue([track]);
+      setContextIndex(0);
+    }
+
+    // Starting a new track/album sets a clean user queue
+    setUserQueue([]);
+
+    startPlaybackStream(track);
+  }
+
+  /**
+   * Priority Resolution:
+   * 1. Repeat One -> replay current track
+   * 2. User Queue -> pop & play top track from userQueue (contextIndex preserved)
+   * 3. Context Queue -> advance contextIndex and play next album track
+   * 4. End of Context -> Repeat All loops to track 1; Repeat Off stops cleanly
+   */
+  function playNextInHierarchy(userInitiated = false) {
+    if (!userInitiated && repeatMode() === 'one') {
+      seek(0);
+      play();
+      return;
+    }
+
+    // 1. Check User Queue (Explicit Priority)
+    const uq = userQueue();
+    if (uq.length > 0) {
+      const nextSong = uq[0];
+      setUserQueue(uq.slice(1));
+      startPlaybackStream(nextSong);
+      return;
+    }
+
+    // 2. Check Context Queue (Passive Album/Playlist Flow)
+    const cq = contextQueue();
+    const nextCtxIdx = contextIndex() + 1;
+    if (nextCtxIdx < cq.length) {
+      setContextIndex(nextCtxIdx);
+      startPlaybackStream(cq[nextCtxIdx]);
+      return;
+    }
+
+    // 3. Reached end of Context
+    if (repeatMode() === 'all' && cq.length > 0) {
+      setContextIndex(0);
+      startPlaybackStream(cq[0]);
+    } else {
+      // Natural stop — no infinite loop!
+      setIsPlaying(false);
+      audio.currentTime = 0;
+      setCurrentTime(0);
+      updateMediaSessionPlaybackState('none');
+    }
   }
 
   function play() {
     if (audio.src) {
       audio.play().catch((err) => console.error('Play error', err));
-    } else if (queue().length > 0) {
-      const idx = queueIndex();
-      playTrack(queue()[idx] || queue()[0], queue(), idx);
+    } else if (contextQueue().length > 0) {
+      const idx = contextIndex();
+      startPlaybackStream(contextQueue()[idx] || contextQueue()[0]);
     }
   }
 
@@ -181,31 +279,28 @@ function createAudioPlayer() {
   }
 
   function previousTrack() {
-    const q = queue();
-    if (q.length === 0) return;
-    
     if (audio.currentTime > 3) {
       audio.currentTime = 0;
       return;
     }
 
-    let nextIdx = queueIndex() - 1;
-    if (nextIdx < 0) {
-      nextIdx = q.length - 1;
+    const cq = contextQueue();
+    if (cq.length === 0) return;
+
+    let prevIdx = contextIndex() - 1;
+    if (prevIdx < 0) {
+      if (repeatMode() === 'all') {
+        prevIdx = cq.length - 1;
+      } else {
+        prevIdx = 0;
+      }
     }
-    setQueueIndex(nextIdx);
-    playTrack(q[nextIdx], q, nextIdx);
+    setContextIndex(prevIdx);
+    startPlaybackStream(cq[prevIdx]);
   }
 
   function nextTrack() {
-    const q = queue();
-    if (q.length === 0) return;
-    let nextIdx = queueIndex() + 1;
-    if (nextIdx >= q.length) {
-      nextIdx = 0;
-    }
-    setQueueIndex(nextIdx);
-    playTrack(q[nextIdx], q, nextIdx);
+    playNextInHierarchy(true);
   }
 
   function seek(seconds: number) {
@@ -245,93 +340,120 @@ function createAudioPlayer() {
     }, 2500);
   }
 
-  function addToQueue(tracks: Song | Song[], playNext = false) {
+  // --- USER QUEUE MANAGEMENT ---
+  const [explicitSingleQueueIds, setExplicitSingleQueueIds] = createSignal<Set<string>>(new Set());
+
+  function addToUserQueue(tracks: Song | Song[], playNext = false, isSingle = false) {
     const list = Array.isArray(tracks) ? tracks : [tracks];
     if (list.length === 0) return;
 
-    const currentQ = queue();
-    if (currentQ.length === 0) {
+    if (!currentTrack()) {
       playTrack(list[0], list, 0);
       return;
     }
 
+    if (isSingle) {
+      const nextSet = new Set(explicitSingleQueueIds());
+      list.forEach((s) => nextSet.add(s.id));
+      setExplicitSingleQueueIds(nextSet);
+    }
+
     if (playNext) {
-      const idx = queueIndex();
-      const newQ = [...currentQ.slice(0, idx + 1), ...list, ...currentQ.slice(idx + 1)];
-      setQueue(newQ);
-      setOriginalQueue(newQ);
+      setUserQueue([...list, ...userQueue()]);
     } else {
-      const newQ = [...currentQ, ...list];
-      setQueue(newQ);
-      setOriginalQueue(newQ);
+      setUserQueue([...userQueue(), ...list]);
     }
   }
 
-  function removeFromQueue(index: number, silent = false) {
-    const currentQ = queue();
-    if (index < 0 || index >= currentQ.length) return;
-    const newQ = currentQ.filter((_, i) => i !== index);
-    setQueue(newQ);
-    setOriginalQueue(newQ);
-    const currIdx = queueIndex();
-    if (index < currIdx) {
-      setQueueIndex(currIdx - 1);
-    } else if (index === currIdx && newQ.length > 0) {
-      const nextIdx = Math.min(currIdx, newQ.length - 1);
-      setQueueIndex(nextIdx);
-      playTrack(newQ[nextIdx], newQ, nextIdx);
-    }
-    if (!silent) {
-      showToast('Removed from Queue');
+  function removeFromUserQueue(songId: string) {
+    setUserQueue(userQueue().filter((s) => s.id !== songId));
+    if (explicitSingleQueueIds().has(songId)) {
+      const nextSet = new Set(explicitSingleQueueIds());
+      nextSet.delete(songId);
+      setExplicitSingleQueueIds(nextSet);
     }
   }
 
-  function removeFromQueueBySongId(songId: string) {
-    const currentQ = queue();
-    const idx = currentQ.findIndex((s) => s.id === songId);
-    if (idx !== -1) {
-      removeFromQueue(idx, true);
+  function removeFromUserQueueByIndex(index: number) {
+    const uq = userQueue();
+    if (index >= 0 && index < uq.length) {
+      const s = uq[index];
+      removeFromUserQueue(s.id);
     }
   }
 
-  function removeSongsFromQueue(songIds: Set<string>) {
-    const currentQ = queue();
-    const newQ = currentQ.filter((s) => !songIds.has(s.id));
-    setQueue(newQ);
-    setOriginalQueue(newQ);
-    const curr = currentTrack();
-    if (curr && songIds.has(curr.id) && newQ.length > 0) {
-      setQueueIndex(0);
-      playTrack(newQ[0], newQ, 0);
-    } else if (curr) {
-      const newIdx = newQ.findIndex((s) => s.id === curr.id);
-      setQueueIndex(newIdx >= 0 ? newIdx : 0);
-    }
+  function isSongInUserQueue(songId: string): boolean {
+    return userQueue().some((s) => s.id === songId);
   }
 
-  function isSongInQueue(songId: string): boolean {
-    return queue().some((s) => s.id === songId);
+  function isExplicitUserQueued(songId: string): boolean {
+    return explicitSingleQueueIds().has(songId);
   }
 
-  function clearQueue() {
-    const curr = currentTrack();
-    if (curr) {
-      setQueue([curr]);
-      setOriginalQueue([curr]);
-      setQueueIndex(0);
-    } else {
-      setQueue([]);
-      setOriginalQueue([]);
-      setQueueIndex(0);
-    }
+  /**
+   * Clear ONLY the manual User Queue, keeping the active album/context completely intact.
+   */
+  function clearUserQueue() {
+    setUserQueue([]);
+    setExplicitSingleQueueIds(new Set());
     showToast('Queue Cleared');
   }
 
+  function jumpToUserQueueIndex(index: number) {
+    const uq = userQueue();
+    if (index >= 0 && index < uq.length) {
+      const song = uq[index];
+      removeFromUserQueueByIndex(index);
+      startPlaybackStream(song);
+    }
+  }
+
+  function jumpToContextIndex(index: number) {
+    const cq = contextQueue();
+    if (index >= 0 && index < cq.length) {
+      setContextIndex(index);
+      startPlaybackStream(cq[index]);
+    }
+  }
+
+  // Backwards compatibility aliases
+  function addToQueue(tracks: Song | Song[], playNext = false) {
+    addToUserQueue(tracks, playNext, !Array.isArray(tracks));
+  }
+
+  function removeFromQueue(index: number, _silent = false) {
+    removeFromUserQueueByIndex(index);
+  }
+
+  function removeFromQueueBySongId(songId: string) {
+    removeFromUserQueue(songId);
+  }
+
+  function removeSongsFromQueue(songIds: Set<string>) {
+    setUserQueue(userQueue().filter((s) => !songIds.has(s.id)));
+    const nextSet = new Set(explicitSingleQueueIds());
+    songIds.forEach((id) => nextSet.delete(id));
+    setExplicitSingleQueueIds(nextSet);
+  }
+
+  function isSongInQueue(songId: string): boolean {
+    return isSongInUserQueue(songId);
+  }
+
+  function clearQueue() {
+    clearUserQueue();
+  }
+
   function jumpToQueueIndex(index: number) {
-    const currentQ = queue();
-    if (index >= 0 && index < currentQ.length) {
-      setQueueIndex(index);
-      playTrack(currentQ[index], currentQ, index);
+    // If index is within userQueue
+    const uq = userQueue();
+    if (index < uq.length) {
+      jumpToUserQueueIndex(index);
+    } else {
+      // index is within contextQueue (offset by contextIndex + 1)
+      const contextOffset = index - uq.length;
+      const targetCtxIdx = contextIndex() + 1 + contextOffset;
+      jumpToContextIndex(targetCtxIdx);
     }
   }
 
@@ -340,19 +462,33 @@ function createAudioPlayer() {
     isPlaying,
     currentTime,
     duration,
+    contextQueue,
+    contextIndex,
+    userQueue,
+    isShuffle,
+    repeatMode,
+    upcomingCount,
     queue,
     queueIndex,
-    isShuffle,
     toastMessage,
     showToast,
     addToQueue,
+    addToUserQueue,
     removeFromQueue,
+    removeFromUserQueue,
+    removeFromUserQueueByIndex,
     removeFromQueueBySongId,
     removeSongsFromQueue,
     isSongInQueue,
+    isSongInUserQueue,
+    isExplicitUserQueued,
     clearQueue,
+    clearUserQueue,
     jumpToQueueIndex,
+    jumpToUserQueueIndex,
+    jumpToContextIndex,
     toggleShuffle,
+    toggleRepeatMode,
     playTrack,
     play,
     pause,

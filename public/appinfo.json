@@ -1,14 +1,14 @@
 {
   "id": "org.navidrome.tv",
-  "version": "1.7.0",
+  "version": "1.7.3",
   "vendor": "Community",
   "type": "web",
   "main": "index.html",
   "title": "NavidOS",
   "icon": "icon.png",
   "largeIcon": "largeIcon.png",
-  "splashBackground": "splash.png",
-  "splashColor": "#000000",
+  "noSplashOnLaunch": true,
+  "spinnerOnLaunch": false,
   "bgColor": "#000000",
   "disableBackHistoryAPI": true,
   "requiredPermissions": [

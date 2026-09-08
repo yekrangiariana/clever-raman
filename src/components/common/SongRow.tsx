@@ -24,8 +24,8 @@ function formatDuration(sec: number): string {
 export const SongRow: Component<SongRowProps> = (props) => {
   const [isStarred, setIsStarred] = createSignal<boolean>(!!props.song.starred);
 
-  const isInQueue = createMemo(() => {
-    return audioPlayer.queue().some((s) => s.id === props.song.id);
+  const isUserQueued = createMemo(() => {
+    return audioPlayer.isExplicitUserQueued(props.song.id);
   });
 
   createEffect(() => {
@@ -43,10 +43,10 @@ export const SongRow: Component<SongRowProps> = (props) => {
 
   const handleQueueClick = (e: Event) => {
     e.stopPropagation();
-    if (isInQueue()) {
-      audioPlayer.removeFromQueueBySongId(props.song.id);
+    if (isUserQueued()) {
+      audioPlayer.removeFromUserQueue(props.song.id);
     } else {
-      audioPlayer.addToQueue(props.song);
+      audioPlayer.addToUserQueue(props.song, false, true);
     }
   };
 
@@ -79,18 +79,18 @@ export const SongRow: Component<SongRowProps> = (props) => {
         <button
           onClick={handleQueueClick}
           class={`p-2.5 rounded-full transition-all flex items-center justify-center shadow-md ${
-            isInQueue()
+            isUserQueued()
               ? 'bg-emerald-600 border border-emerald-400 text-white is-added'
               : 'bg-neutral-800/90 border border-neutral-700/80 text-white hover:bg-neutral-700'
           }`}
           data-focusable="true"
           data-variant="topPick"
-          data-added={isInQueue() ? "true" : undefined}
+          data-added={isUserQueued() ? "true" : undefined}
           data-section={`${props.section}_queue`}
           data-index={props.focusIndex}
-          title={isInQueue() ? "In Queue (Click to Remove)" : "Add to Queue"}
+          title={isUserQueued() ? "In Queue (Click to Remove)" : "Add to Queue"}
         >
-          {isInQueue() ? <CheckIcon class="w-6 h-6 text-white" /> : <QueueAddIcon class="w-6 h-6" />}
+          {isUserQueued() ? <CheckIcon class="w-6 h-6 text-white" /> : <QueueAddIcon class="w-6 h-6" />}
         </button>
 
         {props.onToggleStar && (
