@@ -24,11 +24,14 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
         data-section={props.section}
         data-index={props.index}
       >
-        {/* Vibrant Apple Pastel Gradient Background */}
+        {/* Deep Moody Gradient Background */}
         <div class={`absolute inset-0 bg-gradient-to-br ${getCardGradient(props.title, props.colorIndex)}`} />
 
+        {/* Global darkening tint for comfortable OLED TV contrast */}
+        <div class="absolute inset-0 bg-black/30 z-[5]" />
+
         {/* Soft bottom vignette for contrast & readability */}
-        <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent z-10" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10" />
 
         {/* Top Brand / Category Tag with Equalizer Badge */}
         <div class="relative z-20 flex items-center gap-1.5 text-white/90">

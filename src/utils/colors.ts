@@ -1,16 +1,16 @@
 export const APPLE_PASTEL_GRADIENTS = [
-  'from-pink-400 via-rose-500 to-purple-800',       // Pastel Rose & Magenta
-  'from-sky-300 via-blue-500 to-indigo-800',        // Apple Powder Blue
-  'from-teal-300 via-emerald-500 to-slate-900',     // Sage Mint
-  'from-amber-300 via-orange-400 to-rose-700',      // Soft Peach Sunset
-  'from-purple-300 via-violet-500 to-indigo-950',    // Lavender Violet
-  'from-fuchsia-300 via-pink-500 to-rose-900',      // Neon Orchid
-  'from-indigo-300 via-purple-500 to-slate-900',     // Soft Periwinkle
-  'from-emerald-300 via-teal-500 to-cyan-950',      // Ice Mint
-  'from-orange-300 via-rose-400 to-purple-900',     // Soft Tangerine Coral
-  'from-violet-300 via-fuchsia-500 to-purple-950',   // Lilac Glow
-  'from-amber-200 via-yellow-500 to-stone-900',     // Champagne Gold
-  'from-rose-300 via-orange-500 to-slate-900',      // Apple Coral Dusk
+  'from-rose-800 via-purple-900 to-neutral-950',       // Deep Crimson & Purple
+  'from-blue-800 via-indigo-900 to-neutral-950',        // Deep Sapphire & Navy
+  'from-teal-800 via-emerald-900 to-neutral-950',       // Deep Forest Emerald
+  'from-amber-800 via-rose-900 to-neutral-950',         // Dark Amber & Crimson
+  'from-purple-800 via-violet-950 to-neutral-950',      // Deep Royal Violet
+  'from-fuchsia-800 via-pink-900 to-neutral-950',       // Dark Plum Orchid
+  'from-indigo-800 via-purple-900 to-neutral-950',      // Midnight Indigo
+  'from-emerald-800 via-teal-900 to-neutral-950',       // Deep Oceanic Jade
+  'from-orange-800 via-red-950 to-neutral-950',         // Dark Terracotta Dusk
+  'from-violet-800 via-fuchsia-950 to-neutral-950',     // Dark Velvet Amethyst
+  'from-amber-900 via-stone-900 to-neutral-950',        // Dark Bronze
+  'from-red-800 via-rose-950 to-neutral-950',           // Deep Wine Garnet
 ];
 
 export function getCardGradient(name: string, colorIndex?: number): string {

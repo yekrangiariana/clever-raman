@@ -1,6 +1,6 @@
 {
   "id": "org.navidrome.tv",
-  "version": "1.6.9",
+  "version": "1.7.0",
   "vendor": "Community",
   "type": "web",
   "main": "index.html",
