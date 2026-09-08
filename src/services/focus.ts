@@ -1,7 +1,7 @@
 import { createSignal, createRoot } from 'solid-js';
 import { audioPlayer } from './audio';
 
-export type FocusSection = 'topBar' | 'grid' | 'albumDetail' | 'nowPlaying' | 'nowPlayingQueue' | 'nowPlayingQueue_remove' | 'setup' | 'search' | 'search_mode' | 'search_kbd' | 'search_tabs' | 'search_results' | 'settings' | 'settingsModal' | 'exitConfirm' | 'albumFilters';
+export type FocusSection = 'topBar' | 'grid' | 'albumDetail' | 'nowPlaying' | 'nowPlayingQueue' | 'nowPlayingQueue_header' | 'nowPlayingQueue_remove' | 'setup' | 'search' | 'search_mode' | 'search_kbd' | 'search_tabs' | 'search_results' | 'settings' | 'settingsModal' | 'exitConfirm' | 'albumFilters';
 
 export interface FocusLocation {
   section: FocusSection;
@@ -344,11 +344,18 @@ function createFocusEngine() {
       }
     } else if (section === 'nowPlaying') {
       if (index > 0) setFocus('nowPlaying', 0);
+    } else if (section === 'nowPlayingQueue_header') {
+      setFocus('nowPlaying', 7);
     } else if (section === 'nowPlayingQueue') {
       if (index > 0) {
         setFocus('nowPlayingQueue', index - 1);
       } else {
-        setFocus('nowPlaying', 7);
+        const headerElem = document.querySelector('[data-section="nowPlayingQueue_header"]');
+        if (headerElem) {
+          setFocus('nowPlayingQueue_header' as FocusSection, 0);
+        } else {
+          setFocus('nowPlaying', 7);
+        }
       }
     } else if (section === 'nowPlayingQueue_remove') {
       const prevBtn = document.querySelector(`[data-section="nowPlayingQueue_remove"][data-index="${index - 1}"]`);
@@ -471,6 +478,9 @@ function createFocusEngine() {
         const queueElem = document.querySelector('[data-section="nowPlayingQueue"]');
         if (queueElem) setFocus('nowPlayingQueue', 0);
       }
+    } else if (section === 'nowPlayingQueue_header') {
+      const queueTrack = document.querySelector('[data-section="nowPlayingQueue"][data-index="0"]');
+      if (queueTrack) setFocus('nowPlayingQueue', 0);
     } else if (section === 'nowPlayingQueue') {
       if (index < totalCount - 1) setFocus('nowPlayingQueue', index + 1);
     } else if (section === 'nowPlayingQueue_remove') {
@@ -544,6 +554,8 @@ function createFocusEngine() {
       }
     } else if (section === 'nowPlaying') {
       if (index > 0) setFocus('nowPlaying', index - 1);
+    } else if (section === 'nowPlayingQueue_header') {
+      setFocus('nowPlaying', 7);
     } else if (section === 'nowPlayingQueue') {
       setFocus('nowPlaying', 7);
     } else if (section === 'nowPlayingQueue_remove') {
@@ -705,7 +717,7 @@ function createFocusEngine() {
       setFocus('settings', modal === 'settingsServer' ? 0 : 2);
       return;
     }
-    if (currentLocation().section === 'nowPlayingQueue') {
+    if (currentLocation().section.startsWith('nowPlayingQueue')) {
       setFocus('nowPlaying', 7);
       return;
     }

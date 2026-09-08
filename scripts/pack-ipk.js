@@ -17,7 +17,7 @@ if (!fs.existsSync(appinfoPath)) {
 }
 
 const appinfo = JSON.parse(fs.readFileSync(appinfoPath, 'utf8'));
-const appId = appinfo.id || 'org.navidrome.tv';
+const appId = appinfo.id || 'org.navios.tv';
 const version = appinfo.version || '1.0.1';
 const outputDir = path.resolve('dist-webos');
 const ipkFileName = `${appId}_${version}_all.ipk`;
@@ -66,7 +66,7 @@ Section: misc
 Priority: optional
 Architecture: all
 Maintainer: Community
-Description: Music TV for LG webOS
+Description: NaviOS for LG webOS
 `;
 
 fs.writeFileSync(path.join(controlDir, 'control'), controlContent);
@@ -104,12 +104,34 @@ if (fs.existsSync(finalIpkPath)) {
   fs.unlinkSync(finalIpkPath);
 }
 
-try {
-  execSync(`ar -cr "${finalIpkPath}" debian-binary control.tar.gz data.tar.gz`, { cwd: scratchDir });
-} catch (e) {
-  // If ar is missing, tar can archive the components
-  execSync(`tar -cf "${finalIpkPath}" debian-binary control.tar.gz data.tar.gz`, { cwd: scratchDir });
+function createAr(outputPath, files) {
+  const fd = fs.openSync(outputPath, 'w');
+  fs.writeSync(fd, '!<arch>\n');
+  for (const { name, path: filePath } of files) {
+    const stats = fs.statSync(filePath);
+    const size = stats.size;
+    // Standard ar format padding
+    const paddedName = name.padEnd(16, ' ');
+    const timestamp = Math.floor(stats.mtimeMs / 1000).toString().padEnd(12, ' ');
+    const owner = '0'.padEnd(6, ' ');
+    const group = '0'.padEnd(6, ' ');
+    const mode = '100644'.padEnd(8, ' ');
+    const sizeStr = size.toString().padEnd(10, ' ');
+    
+    fs.writeSync(fd, paddedName + timestamp + owner + group + mode + sizeStr + '`\n');
+    fs.writeSync(fd, fs.readFileSync(filePath));
+    if (size % 2 !== 0) {
+      fs.writeSync(fd, '\n');
+    }
+  }
+  fs.closeSync(fd);
 }
+
+createAr(finalIpkPath, [
+  { name: 'debian-binary', path: path.join(scratchDir, 'debian-binary') },
+  { name: 'control.tar.gz', path: path.join(scratchDir, 'control.tar.gz') },
+  { name: 'data.tar.gz', path: path.join(scratchDir, 'data.tar.gz') }
+]);
 
 // Cleanup scratch
 fs.rmSync(scratchDir, { recursive: true, force: true });

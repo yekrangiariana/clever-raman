@@ -131,6 +131,9 @@ export const TrashIcon: Component<IconProps> = (props) => (
   </svg>
 );
 
+export const CloseIcon = TrashIcon;
+export const XIcon = TrashIcon;
+
 /**
  * Search Icon (Magnifying Glass)
  */
@@ -266,6 +269,21 @@ export const CheckIcon: Component<IconProps> = (props) => (
 export const EqualizerIcon: Component<IconProps> = (props) => (
   <svg class={props.class || "w-6 h-6"} viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" />
+  </svg>
+);
+
+/**
+ * Sparkles / Discovery Compass Star Icon
+ */
+export const SparklesIcon: Component<IconProps> = (props) => (
+  <svg
+    class={props.class || "w-6 h-6"}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+  >
+    <path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z" />
+    <path d="M19 16L19.8 18.2L22 19L19.8 19.8L19 22L18.2 19.8L16 19L18.2 18.2L19 16Z" opacity="0.85" />
+    <path d="M5 2L5.8 4.2L8 5L5.8 5.8L5 8L4.2 5.8L2 5L4.2 4.2L5 2Z" opacity="0.85" />
   </svg>
 );
 

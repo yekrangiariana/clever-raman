@@ -1,10 +1,10 @@
 {
-  "id": "org.navidrome.tv",
-  "version": "1.7.3",
+  "id": "org.navios.tv",
+  "version": "1.8.5",
   "vendor": "Community",
   "type": "web",
   "main": "index.html",
-  "title": "NavidOS",
+  "title": "NaviOS",
   "icon": "icon.png",
   "largeIcon": "largeIcon.png",
   "noSplashOnLaunch": true,

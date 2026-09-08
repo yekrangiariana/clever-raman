@@ -62,9 +62,10 @@ export interface SearchResult {
   artists: { id: string; name: string; coverArt?: string }[];
 }
 
-const STORAGE_KEY = 'navidrome_tv_config';
+const STORAGE_KEY = 'navios_config';
+const LEGACY_STORAGE_KEY = 'navidrome_tv_config';
 const API_VERSION = '1.16.1';
-const CLIENT_NAME = 'navidrome-tv';
+const CLIENT_NAME = 'NaviOS';
 
 function stringToHex(str: string): string {
   let hex = '';
@@ -93,7 +94,7 @@ class SubsonicApi {
     }
 
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (saved) {
         this.config = JSON.parse(saved);
         return this.config;
@@ -130,6 +131,7 @@ class SubsonicApi {
     this.config = null;
     this.clearDetailsCache();
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   }
 
   public isConfigured(): boolean {
@@ -158,24 +160,36 @@ class SubsonicApi {
     const separator = endpoint.includes('?') ? '&' : '?';
     const url = `${this.config.serverUrl}/rest/${endpoint}${separator}${auth}${query ? '&' + query : ''}`;
 
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`HTTP error ${res.status}: ${res.statusText}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        throw new Error(`HTTP error ${res.status}: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      const response = data['subsonic-response'];
+
+      if (!response) {
+        throw new Error('Invalid Subsonic API response format');
+      }
+
+      if (response.status === 'failed') {
+        const err = response.error?.message || 'Subsonic API request failed';
+        throw new Error(err);
+      }
+
+      return response;
+    } catch (e: any) {
+      clearTimeout(timeoutId);
+      if (e.name === 'AbortError') {
+        throw new Error(`Request timed out after 12s (${endpoint})`);
+      }
+      throw e;
     }
-
-    const data = await res.json();
-    const response = data['subsonic-response'];
-
-    if (!response) {
-      throw new Error('Invalid Subsonic API response format');
-    }
-
-    if (response.status === 'failed') {
-      const err = response.error?.message || 'Subsonic API request failed';
-      throw new Error(err);
-    }
-
-    return response;
   }
 
   public async ping(customConfig?: { serverUrl: string; username: string; password: string }): Promise<boolean> {
@@ -236,15 +250,15 @@ class SubsonicApi {
       console.warn('getAlbumList.view fallback failed', e);
     }
 
-    // If type wasn't alphabeticalByName, try alphabeticalByName as final safety net
-    if (type !== 'alphabeticalByName') {
-      try {
-        const fallbackRes = await this.request<{ albumList2?: { album?: Album[] }; albumList?: { album?: Album[] } }>('getAlbumList2.view', { type: 'alphabeticalByName', size, offset });
-        return fallbackRes.albumList2?.album || fallbackRes.albumList?.album || [];
-      } catch (e) {}
-    }
-
     return [];
+  }
+
+  public getCachedAlbum(id: string): { album: Album; songs: Song[] } | undefined {
+    return this.albumDetailsCache.get(id);
+  }
+
+  public getCachedPlaylist(id: string): { playlist: Playlist; songs: Song[] } | undefined {
+    return this.playlistDetailsCache.get(id);
   }
 
   /**

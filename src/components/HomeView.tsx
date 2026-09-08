@@ -9,9 +9,9 @@ import { SectionHeader } from './common/SectionHeader';
 
 interface HomeViewProps {
   onSelectAlbum: (album: Album) => void;
-  onSelectPlaylist?: (playlist: Playlist) => void;
+  onSelectPlaylist?: (playlist: Playlist, coverVariant?: 'station' | 'meshMix') => void;
   onSelectGenre?: (genre: string) => void;
-  onSelectMix?: (genre: string) => void;
+  onSelectMix?: (genre: string, coverVariant?: 'meshMix' | 'genreMix') => void;
 }
 
 interface HomeData {
@@ -34,27 +34,31 @@ export async function prefetchHomeData(): Promise<HomeData | null> {
   if (cachedHomeData) return cachedHomeData;
 
   try {
-    const [newestRes, starredRes, starred2Res, randomRes, genresRes, playlistsRes] = await Promise.allSettled([
-      api.getAlbumList('newest', 40),
-      api.getAlbumList('starred', 40),
+    // Lean batch sizes (20 max) to keep memory footprint minimal and network fast on webOS
+    const [newestRes, starred2Res, randomRes, playlistsRes, genresRes] = await Promise.allSettled([
+      api.getAlbumList('newest', 20),
       api.getStarred2(),
-      api.getAlbumList('random', 40),
-      api.getGenres(),
+      api.getAlbumList('random', 20),
       api.getPlaylists(),
+      api.getGenres(),
     ]);
 
     const newestRaw = newestRes.status === 'fulfilled' ? newestRes.value : [];
-    let starredRaw = starredRes.status === 'fulfilled' ? starredRes.value : [];
     const starred2Data = starred2Res.status === 'fulfilled' ? starred2Res.value : { albums: [], songs: [] };
-    if (starredRaw.length === 0 && starred2Data.albums.length > 0) {
-      starredRaw = starred2Data.albums;
+    let starredRaw = starred2Data.albums;
+
+    // Only query starred album list if starred2 didn't return any albums
+    if (starredRaw.length === 0) {
+      try {
+        starredRaw = await api.getAlbumList('starred', 20);
+      } catch (e) {}
     }
 
     const MAX_ITEMS = 20;
     const starredTracks = starred2Data.songs.slice(0, MAX_ITEMS);
     const randomRaw = randomRes.status === 'fulfilled' ? randomRes.value : [];
-    const genres = genresRes.status === 'fulfilled' ? genresRes.value : [];
     const playlists = playlistsRes.status === 'fulfilled' ? playlistsRes.value : [];
+    const genres = genresRes.status === 'fulfilled' ? genresRes.value : [];
 
     // High performance O(1) deduplication across Home screen sections
     const seenAlbumIds = new Set<string>();
@@ -84,14 +88,16 @@ export async function prefetchHomeData(): Promise<HomeData | null> {
     });
 
     if (newest.length === 0 && random.length === 0) {
-      const fallbackAlbums = await api.getAlbumList('alphabeticalByName', 40);
-      fallbackAlbums.forEach((album) => {
-        if (!seenAlbumIds.has(album.id)) {
-          seenAlbumIds.add(album.id);
-          if (newest.length < 20) newest.push(album);
-          else if (random.length < 20) random.push(album);
-        }
-      });
+      try {
+        const fallbackAlbums = await api.getAlbumList('alphabeticalByName', 20);
+        fallbackAlbums.forEach((album) => {
+          if (!seenAlbumIds.has(album.id)) {
+            seenAlbumIds.add(album.id);
+            if (newest.length < 20) newest.push(album);
+            else if (random.length < 20) random.push(album);
+          }
+        });
+      } catch (e) {}
     }
 
     cachedHomeData = {
@@ -102,22 +108,6 @@ export async function prefetchHomeData(): Promise<HomeData | null> {
       genres,
       playlists,
     };
-
-    // Silently pre-warm top album and playlist tracklists in the background
-    // (runs asynchronously so it never blocks or delays the splash screen)
-    setTimeout(() => {
-      const topAlbumIds = [
-        ...newest.slice(0, 5).map((a) => a.id),
-        ...starred.slice(0, 3).map((a) => a.id),
-      ];
-      if (topAlbumIds.length > 0) {
-        api.prefetchAlbumDetails(topAlbumIds);
-      }
-      const topPlaylistIds = playlists.slice(0, 4).map((p) => p.id);
-      if (topPlaylistIds.length > 0) {
-        api.prefetchPlaylistDetails(topPlaylistIds);
-      }
-    }, 100);
 
     return cachedHomeData;
   } catch (e) {
@@ -156,99 +146,141 @@ export const HomeView: Component<HomeViewProps> = (props) => {
     const now = new Date();
     const localDay = Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
 
-    const parsePlaylistTitle = (name: string): { title: string; subtitle?: string } => {
-      const lower = name.toLowerCase();
-      if (lower.includes('daily random discovery') || lower.includes('random discovery')) {
-        return { title: 'Daily Random', subtitle: 'Discovery' };
-      }
-      if (lower.endsWith(' mix')) {
-        return { title: name.slice(0, -4), subtitle: 'Mix' };
-      }
-      if (lower.endsWith(' playlist')) {
-        return { title: name.slice(0, -9), subtitle: 'Playlist' };
-      }
-      return { title: name, subtitle: 'Playlist' };
+    // Match Daily Random playlist flexible name formats
+    const isDailyRandomPlaylist = (name: string) => {
+      const lower = name.toLowerCase().trim();
+      return (
+        lower.includes('daily random') ||
+        lower.includes('random discovery') ||
+        lower.includes('daily discovery') ||
+        lower === 'discovery' ||
+        lower.includes('discovery mix')
+      );
     };
 
-    // 1. Stable Slot 1: Daily Random Discovery (must have >0 tracks)
+    // Slot 1: The Stable Anchor — Daily Random (Apple Station pulse circle design)
     const discoveryPlaylist = data.playlists.find(
-      (p) =>
-        (p.songCount || 0) > 0 &&
-        (p.name.toLowerCase().includes('daily random discovery') ||
-        p.name.toLowerCase().includes('random discovery'))
+      (p) => (p.songCount || 0) > 0 && isDailyRandomPlaylist(p.name)
     );
-
-    const firstItem = discoveryPlaylist
-      ? {
-          title: parsePlaylistTitle(discoveryPlaylist.name).title,
-          subtitle: parsePlaylistTitle(discoveryPlaylist.name).subtitle,
-          badge: 'Daily Discovery',
-          metadata: `${discoveryPlaylist.songCount} Tracks`,
-          colorIndex: localDay % 12,
-          onClick: () => props.onSelectPlaylist?.(discoveryPlaylist),
+    const slot1 = {
+      categoryLabel: 'Daily Discovery',
+      variant: 'station' as const,
+      title: discoveryPlaylist ? discoveryPlaylist.name : 'Daily Random',
+      subtitle: discoveryPlaylist ? `${discoveryPlaylist.songCount} Tracks` : 'Discovery Mix',
+      onClick: () => {
+        if (discoveryPlaylist) {
+          props.onSelectPlaylist?.(discoveryPlaylist, 'station');
+        } else if (data.random.length > 0) {
+          props.onSelectAlbum(data.random[localDay % data.random.length]);
+        } else if (props.onSelectMix) {
+          props.onSelectMix('Discovery');
+        } else {
+          props.onSelectGenre?.('Discovery');
         }
-      : {
-          title: 'Daily Random',
-          subtitle: 'Discovery Mix',
-          badge: 'Daily Discovery',
-          metadata: `${data.random.length} Albums`,
-          colorIndex: localDay % 12,
-          onClick: () => (props.onSelectMix ? props.onSelectMix('Discovery') : props.onSelectGenre?.('Discovery')),
-        };
+      },
+    };
 
-    // 2. Candidate pool for remaining 3 items (only non-empty playlists and genres)
-    const candidatePool: Array<{
-      title: string;
-      subtitle?: string;
-      badge: string;
-      metadata: string;
-      onClick: () => void;
-    }> = [];
-
-    data.playlists.forEach((pl) => {
-      if (
-        (pl.songCount || 0) > 0 &&
-        pl.id !== discoveryPlaylist?.id &&
-        !pl.name.toLowerCase().includes('random discovery')
-      ) {
-        const parsed = parsePlaylistTitle(pl.name);
-        candidatePool.push({
-          title: parsed.title,
-          subtitle: parsed.subtitle,
-          badge: 'Playlist',
-          metadata: `${pl.songCount} Tracks`,
-          onClick: () => props.onSelectPlaylist?.(pl),
-        });
-      }
-    });
-
-    data.genres.forEach((g) => {
-      if ((g.albumCount || 0) > 0) {
-        candidatePool.push({
-          title: g.value,
-          subtitle: 'Mix',
-          badge: 'Genre Mix',
-          metadata: `${g.albumCount} Albums`,
-          onClick: () => (props.onSelectMix ? props.onSelectMix(g.value) : props.onSelectGenre?.(g.value)),
-        });
-      }
-    });
-
-    // 3. Seeded Fisher-Yates shuffle using localDay
-    const pool = [...candidatePool];
-    let seed = (localDay * 1664525 + 1013904223) >>> 0;
-    for (let i = pool.length - 1; i > 0; i--) {
-      seed = (seed * 1664525 + 1013904223) >>> 0;
-      const j = seed % (i + 1);
-      [pool[i], pool[j]] = [pool[j], pool[i]];
+    // Slot 2: Album of the Day (Stable per day via localStorage)
+    const todayStr = now.toDateString();
+    let savedAlbumStr = localStorage.getItem('navios_daily_album');
+    let savedAlbumDate = localStorage.getItem('navios_daily_album_date');
+    let randomAlbum: any = null;
+    
+    if (savedAlbumDate === todayStr && savedAlbumStr) {
+      try { randomAlbum = JSON.parse(savedAlbumStr); } catch(e) {}
+    }
+    
+    if (!randomAlbum && data.random && data.random.length > 0) {
+      randomAlbum = data.random[0];
+      localStorage.setItem('navios_daily_album', JSON.stringify(randomAlbum));
+      localStorage.setItem('navios_daily_album_date', todayStr);
     }
 
-    const remainingThree = pool.slice(0, 3).map((item, idx) => ({
-      ...item,
-      colorIndex: (localDay + idx + 1) % 12,
-    }));
+    const slot2 = randomAlbum
+      ? {
+          categoryLabel: 'Album of the Day',
+          variant: 'album' as const,
+          title: randomAlbum.title,
+          subtitle: randomAlbum.artist || 'Unknown Artist',
+          coverArtUrl: api.getCoverArtUrl(randomAlbum.coverArt || randomAlbum.id, 300),
+          onClick: () => props.onSelectAlbum(randomAlbum),
+        }
+      : null;
 
-    return [firstItem, ...remainingThree];
+    // Slot 3: Contextual Time of Day Curated Playlist (Pure Jazz / Smart Playlist)
+    const hour = now.getHours();
+    let timeGreeting = 'For the Afternoon';
+    if (hour >= 5 && hour < 12) timeGreeting = 'For the Morning';
+    else if (hour >= 12 && hour < 17) timeGreeting = 'For the Afternoon';
+    else if (hour >= 17 && hour < 22) timeGreeting = 'For the Evening';
+    else timeGreeting = 'Late Night';
+
+    const nonDiscoveryPlaylists = data.playlists.filter(
+      (p) =>
+        (p.songCount || 0) > 0 &&
+        p.id !== discoveryPlaylist?.id &&
+        !isDailyRandomPlaylist(p.name)
+    );
+
+    const slot3Pl = nonDiscoveryPlaylists.length > 0
+      ? nonDiscoveryPlaylists[localDay % nonDiscoveryPlaylists.length]
+      : null;
+
+    const slot3 = slot3Pl
+      ? {
+          categoryLabel: timeGreeting,
+          variant: 'playlist' as const,
+          title: slot3Pl.name,
+          subtitle: slot3Pl.comment || `${slot3Pl.songCount} Tracks`,
+          coverArtUrl: api.getCoverArtUrl(slot3Pl.coverArt || slot3Pl.id, 300),
+          onClick: () => props.onSelectPlaylist?.(slot3Pl),
+        }
+      : null;
+
+    // Slot 4: Genre Mix (genreMix variant)
+    const genre = data.genres.length > 0 ? data.genres[localDay % data.genres.length] : null;
+    const slot4 = genre
+      ? {
+          categoryLabel: 'Genre Focus',
+          variant: 'genreMix' as const,
+          title: `${genre.value} Mix`,
+          subtitle: `${genre.albumCount} Albums`,
+          onClick: () => props.onSelectMix?.(genre.value, 'genreMix'),
+        }
+      : null;
+
+    // Slot 5: Made For You — Favorites Mix (Fluid gradient with artist roster)
+    const artistsSet = new Set<string>();
+    data.starredTracks?.forEach((t) => { if (t.artist) artistsSet.add(t.artist); });
+    data.starred?.forEach((a) => { if (a.artist) artistsSet.add(a.artist); });
+    data.newest?.forEach((a) => { if (a.artist) artistsSet.add(a.artist); });
+    data.random?.forEach((a) => { if (a.artist) artistsSet.add(a.artist); });
+
+    const artistRoster = Array.from(artistsSet).slice(0, 8).join(', ') + '...';
+
+    const slot5 = {
+      categoryLabel: 'Made For You',
+      variant: 'meshMix' as const,
+      title: 'Favorites Mix',
+      subtitle: 'Mix',
+      metadata: artistRoster,
+      onClick: () => {
+        props.onSelectMix?.('favorites', 'meshMix');
+      },
+    };
+
+    // Reordered: Daily Random, Genre Mix, Favorites Mix, Album of the Day, Smart Playlist
+    const picks = [slot1, slot4, slot5, slot2, slot3].filter(Boolean) as Array<{
+      categoryLabel: string;
+      variant: 'album' | 'station' | 'playlist' | 'meshMix' | 'genreMix';
+      title: string;
+      subtitle?: string;
+      metadata?: string;
+      coverArtUrl?: string;
+      onClick: () => void;
+    }>;
+
+    return picks;
   });
 
   // Contiguous focus index across sections: TopPicks (4) -> Starred Albums (20) -> Starred Tracks (20) -> Newest (20) -> Random (20)
@@ -285,19 +317,20 @@ export const HomeView: Component<HomeViewProps> = (props) => {
 
       {homeData() && (
         <div class="flex flex-col gap-12 pb-24">
-          {/* Section 1: Dynamic Top Picks (4 items: Daily Random Discovery + 3 24h rotating items) */}
+          {/* Section 1: Dynamic Top Picks (5 items) */}
           <section class="flex flex-col w-full">
             <SectionHeader title="Top Picks" />
-            <div class="grid grid-cols-4 gap-6 w-full py-8 px-4 -my-4 overflow-visible">
+            <div class="flex flex-row gap-6 overflow-x-auto [::-webkit-scrollbar]:hidden py-8 px-8 -mx-4 -my-4 [scroll-padding:36px]">
               <For each={dailyTopPicks()}>
                 {(pick, index) => (
-                  <div class="w-full">
+                  <div class="w-[calc((100%-4.5rem)/4.35)] shrink-0 min-w-[19.5rem]">
                     <TopPickCard
                       title={pick.title}
                       subtitle={pick.subtitle}
-                      badge={pick.badge}
                       metadata={pick.metadata}
-                      colorIndex={pick.colorIndex}
+                      categoryLabel={pick.categoryLabel}
+                      variant={pick.variant}
+                      coverArtUrl={pick.coverArtUrl}
                       section="grid"
                       index={getIndex('topPicks', index())}
                       onClick={pick.onClick}

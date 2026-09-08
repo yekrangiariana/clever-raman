@@ -8,7 +8,7 @@ export const ExitConfirmModal: Component = () => {
     <Show when={isOpen()}>
       <div class="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-8">
         <h2 class="text-4xl font-semibold text-white tracking-normal mb-9 text-center">
-          Do you want to exit NavidOS?
+          Do you want to exit NaviOS?
         </h2>
 
         <div class="flex flex-col gap-3.5 items-center w-full">

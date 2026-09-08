@@ -12,7 +12,7 @@ import {
   RepeatOneIcon,
   HeartIcon,
   QueueListIcon,
-  TrashIcon,
+  CloseIcon,
   ArrowLeftIcon,
   MusicNoteIcon,
 } from './common/Icons';
@@ -288,7 +288,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                     onClick={handleClearUserQueue}
                     class="px-5 py-2 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-300 hover:text-white text-base font-extrabold transition-all"
                     data-focusable="true"
-                    data-section="nowPlayingQueue"
+                    data-section="nowPlayingQueue_header"
                     data-index="0"
                   >
                     Clear
@@ -304,53 +304,48 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
             <div class="flex-1 overflow-y-auto flex flex-col gap-1.5 pr-2">
               {/* 1. Currently Playing Track at Top */}
               <Show when={track()}>
-                {(() => {
-                  const currentFocusIndex = hasClear() ? 1 : 0;
-                  return (
-                    <div class="flex flex-col w-full">
-                      <div
-                        class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-white text-black font-extrabold shadow-xl scale-[1.01]"
-                        data-focusable="true"
-                        data-variant="list"
-                        data-section="nowPlayingQueue"
-                        data-index={currentFocusIndex}
-                      >
-                        <div class="flex items-center gap-5 truncate flex-1 min-w-0">
-                          <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
-                            {coverUrl() ? (
-                              <img src={coverUrl()} alt={track()!.title} class="w-full h-full object-cover" />
-                            ) : (
-                              <div class="w-full h-full flex items-center justify-center text-neutral-600">
-                                <MusicNoteIcon class="w-8 h-8" />
-                              </div>
-                            )}
+                <div class="flex flex-col w-full">
+                  <div
+                    class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-white text-black font-extrabold shadow-xl scale-[1.01]"
+                    data-focusable="true"
+                    data-variant="list"
+                    data-playing="true"
+                    data-section="nowPlayingQueue"
+                    data-index="0"
+                  >
+                    <div class="flex items-center gap-5 truncate flex-1 min-w-0">
+                      <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
+                        {coverUrl() ? (
+                          <img src={coverUrl()} alt={track()!.title} class="w-full h-full object-cover" />
+                        ) : (
+                          <div class="w-full h-full flex items-center justify-center text-neutral-600">
+                            <MusicNoteIcon class="w-8 h-8" />
                           </div>
-
-                          <span class="w-3.5 h-3.5 rounded-full bg-black inline-block animate-pulse play-indicator shrink-0 mr-1" />
-
-                          <div class="flex flex-col truncate min-w-0 flex-1">
-                            <span class="text-2xl font-extrabold truncate leading-snug">{track()!.title}</span>
-                            <span class="text-lg truncate font-medium text-neutral-700">{track()!.artist}</span>
-                          </div>
-                        </div>
-
-                        <div class="flex items-center gap-6 shrink-0 ml-4">
-                          <span class="font-mono text-xl font-medium text-black">
-                            {formatDuration(track()!.duration || audioPlayer.duration())}
-                          </span>
-                        </div>
+                        )}
                       </div>
-                      <div class="w-full h-px bg-white/10 my-0.5" />
+
+                      <span class="w-3.5 h-3.5 rounded-full bg-black inline-block animate-pulse play-indicator shrink-0 mr-1" />
+
+                      <div class="flex flex-col truncate min-w-0 flex-1">
+                        <span class="text-2xl font-extrabold truncate leading-snug">{track()!.title}</span>
+                        <span class="text-lg truncate font-medium text-neutral-700">{track()!.artist}</span>
+                      </div>
                     </div>
-                  );
-                })()}
+
+                    <div class="flex items-center gap-6 shrink-0 ml-4">
+                      <span class="font-mono text-xl font-medium text-black">
+                        {formatDuration(track()!.duration || audioPlayer.duration())}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="w-full h-px bg-white/10 my-0.5" />
+                </div>
               </Show>
 
               {/* 2. Manually Added User Queue Items */}
               <For each={userQueue()}>
                 {(song, uqIndex) => {
-                  const baseIdx = (hasClear() ? 1 : 0) + 1; // 1 after current track
-                  const itemFocusIndex = baseIdx + uqIndex();
+                  const itemFocusIndex = 1 + uqIndex();
                   return (
                     <div class="flex flex-col w-full">
                       <div
@@ -392,14 +387,14 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                           </span>
                           <button
                             onClick={(e) => handleRemoveUserQueueItem(uqIndex(), e)}
-                            class="p-2.5 rounded-full text-neutral-400 hover:text-white transition-all flex items-center justify-center shrink-0"
+                            class="p-2.5 rounded-full transition-all flex items-center justify-center border shadow-md bg-neutral-800/90 border-neutral-700/80 text-neutral-400 hover:text-white hover:bg-neutral-700 shrink-0"
                             data-focusable="true"
                             data-variant="topPick"
                             data-section="nowPlayingQueue_remove"
                             data-index={itemFocusIndex}
-                            title="Remove"
+                            title="Remove from Queue"
                           >
-                            <TrashIcon class="w-5 h-5" />
+                            <CloseIcon class="w-5 h-5" />
                           </button>
                         </div>
                       </div>
@@ -423,8 +418,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               {/* 4. Upcoming Context Queue Items */}
               <For each={upcomingContext()}>
                 {(song, relIndex) => {
-                  const baseIdx = (hasClear() ? 1 : 0) + 1 + userQueue().length;
-                  const itemFocusIndex = baseIdx + relIndex();
+                  const itemFocusIndex = 1 + userQueue().length + relIndex();
                   const actualContextIndex = contextIndex() + 1 + relIndex();
                   return (
                     <div class="flex flex-col w-full">
@@ -467,14 +461,14 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                           </span>
                           <button
                             onClick={(e) => handleRemoveContextItem(relIndex(), e)}
-                            class="p-2.5 rounded-full text-neutral-400 hover:text-white transition-all flex items-center justify-center shrink-0"
+                            class="p-2.5 rounded-full transition-all flex items-center justify-center border shadow-md bg-neutral-800/90 border-neutral-700/80 text-neutral-400 hover:text-white hover:bg-neutral-700 shrink-0"
                             data-focusable="true"
                             data-variant="topPick"
                             data-section="nowPlayingQueue_remove"
                             data-index={itemFocusIndex}
-                            title="Remove"
+                            title="Remove from Queue"
                           >
-                            <TrashIcon class="w-5 h-5" />
+                            <CloseIcon class="w-5 h-5" />
                           </button>
                         </div>
                       </div>

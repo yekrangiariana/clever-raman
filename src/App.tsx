@@ -1,4 +1,4 @@
-import { Component, onMount, onCleanup, createSignal } from 'solid-js';
+import { Component, createSignal, onMount, onCleanup } from 'solid-js';
 import { api, Album, Playlist } from './services/api';
 import { audioPlayer } from './services/audio';
 import { focusEngine } from './services/focus';
@@ -17,10 +17,11 @@ import { ExitConfirmModal } from './components/common/ExitConfirmModal';
 
 export const App: Component = () => {
   const [selectedAlbum, setSelectedAlbum] = createSignal<Album | null>(null);
-  const [selectedPlaylistId, setSelectedPlaylistId] = createSignal<string | null>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = createSignal<Playlist | null>(null);
   const [selectedMixGenre, setSelectedMixGenre] = createSignal<string | null>(null);
   const [selectedGenre, setSelectedGenre] = createSignal<string | null>(null);
   const [selectedArtist, setSelectedArtist] = createSignal<string | null>(null);
+  const [selectedCoverVariant, setSelectedCoverVariant] = createSignal<'station' | 'meshMix' | 'genreMix' | null>(null);
 
   onMount(() => {
     let splashDismissed = false;
@@ -41,22 +42,22 @@ export const App: Component = () => {
     } else {
       focusEngine.setFocus('topBar', 0);
 
-      // Intelligent boot warming:
-      // Minimum display time (800ms) prevents abrupt flicker on fast connections.
-      // Maximum safety ceiling (3000ms) guarantees the splash screen NEVER hangs.
-      const minDisplayPromise = new Promise<void>((resolve) => setTimeout(resolve, 800));
-      const safetyTimeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 3000));
+      // Fast, lightweight boot warming:
+      // Minimum display time (600ms) prevents abrupt flicker.
+      // Maximum safety ceiling (2500ms) guarantees the splash screen NEVER hangs.
+      const minDisplayPromise = new Promise<void>((resolve) => setTimeout(resolve, 600));
+      const safetyTimeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2500));
 
-      const prefetchPromise = Promise.allSettled([
-        prefetchHomeData(),
-        prefetchAlbums(),
-      ]);
+      const prefetchPromise = prefetchHomeData();
 
       Promise.race([
         Promise.all([minDisplayPromise, prefetchPromise]),
         safetyTimeoutPromise,
       ]).then(() => {
         dismissSplash();
+        // Lazily warm the album grid cache 3s after home loads — so navigating
+        // to the Albums tab feels instant without competing with home startup.
+        setTimeout(() => prefetchAlbums(), 3000);
       });
     }
 
@@ -72,25 +73,28 @@ export const App: Component = () => {
 
   const handleSelectAlbum = (album: Album) => {
     setSelectedAlbum(album);
-    setSelectedPlaylistId(null);
+    setSelectedPlaylist(null);
     setSelectedMixGenre(null);
+    setSelectedCoverVariant(null);
     focusEngine.setSelectedAlbumId(album.id);
     focusEngine.setActiveModal('albumDetail');
     focusEngine.setFocus('albumDetail', 1);
   };
 
-  const handleSelectPlaylist = (pl: Playlist) => {
-    setSelectedPlaylistId(pl.id);
+  const handleSelectPlaylist = (pl: Playlist, coverVariant?: 'station' | 'meshMix') => {
+    setSelectedPlaylist(pl);
     setSelectedAlbum(null);
     setSelectedMixGenre(null);
+    setSelectedCoverVariant(coverVariant || null);
     focusEngine.setActiveModal('albumDetail');
     focusEngine.setFocus('albumDetail', 1);
   };
 
-  const handleSelectMix = (genre: string) => {
+  const handleSelectMix = (genre: string, coverVariant?: 'meshMix' | 'genreMix') => {
     setSelectedMixGenre(genre);
     setSelectedAlbum(null);
-    setSelectedPlaylistId(null);
+    setSelectedPlaylist(null);
+    setSelectedCoverVariant(coverVariant || null);
     focusEngine.setActiveModal('albumDetail');
     focusEngine.setFocus('albumDetail', 1);
   };
@@ -118,20 +122,21 @@ export const App: Component = () => {
   const handleCloseDetail = () => {
     focusEngine.setActiveModal('none');
     setSelectedAlbum(null);
-    setSelectedPlaylistId(null);
+    setSelectedPlaylist(null);
     setSelectedMixGenre(null);
+    setSelectedCoverVariant(null);
     focusEngine.setFocus('grid', 0);
   };
 
   const nowPlayingBackLabel = () => {
-    if (selectedPlaylistId()) return 'Back to Playlist';
+    if (selectedPlaylist()) return 'Back to Playlist';
     if (selectedMixGenre()) return 'Back to Mix';
     if (selectedAlbum() || audioPlayer.currentTrack()?.albumId) return 'Back to Album';
     return 'Back to Library';
   };
 
   const handleBackFromNowPlaying = () => {
-    if (selectedAlbum() || selectedPlaylistId() || selectedMixGenre()) {
+    if (selectedAlbum() || selectedPlaylist() || selectedMixGenre()) {
       focusEngine.setActiveModal('albumDetail');
       focusEngine.setFocus('albumDetail', 1);
     } else if (audioPlayer.currentTrack()?.albumId) {
@@ -165,11 +170,14 @@ export const App: Component = () => {
       >
         <TopBar />
 
-        {focusEngine.activeModal() === 'albumDetail' && (selectedAlbum() || selectedPlaylistId() || selectedMixGenre()) ? (
+        {focusEngine.activeModal() === 'albumDetail' && (selectedAlbum() || selectedPlaylist() || selectedMixGenre()) ? (
           <AlbumDetailView
             albumId={selectedAlbum()?.id}
-            playlistId={selectedPlaylistId()}
+            playlistId={selectedPlaylist()?.id}
             mixGenre={selectedMixGenre()}
+            initialAlbum={selectedAlbum()}
+            initialPlaylist={selectedPlaylist()}
+            customCoverVariant={selectedCoverVariant()}
             onClose={handleCloseDetail}
           />
         ) : focusEngine.activeTab() === 'home' ? (

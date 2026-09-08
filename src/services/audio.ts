@@ -177,7 +177,9 @@ function createAudioPlayer() {
     const streamUrl = api.getStreamUrl(track.id);
     audio.src = streamUrl;
     audio.play().catch((err) => {
-      console.error('Failed to start audio playback', err);
+      if (err.name !== 'AbortError') {
+        console.error('Failed to start audio playback', err);
+      }
     });
     updateMediaSessionMetadata(track);
   }

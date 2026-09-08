@@ -1,4 +1,4 @@
-# 🎵 Navidrome TV for webOS
+# 🎵 NaviOS for webOS
 
 An elegant, fast, Apple TV-inspired webOS app designed specifically for smart TVs connected to a [Navidrome](https://www.navidrome.org/) music server.
 
@@ -21,7 +21,7 @@ An elegant, fast, Apple TV-inspired webOS app designed specifically for smart TV
 
 ## ⚡ Smart Playlists & Daily Top Picks
 
-Navidrome TV takes full advantage of Navidrome's **Smart Playlist (`.nsp`)** feature to automatically surface relevant music in your **Top Picks** section every single day.
+NaviOS takes full advantage of Navidrome's **Smart Playlist (`.nsp`)** feature to automatically surface relevant music in your **Top Picks** section every single day.
 
 ### What are Smart Playlists?
 Smart Playlists are dynamic, rule-based JSON files stored on your Navidrome server as `.nsp` files. Rather than containing static song lists, they dynamically query your library based on criteria like:
@@ -149,7 +149,7 @@ python3 navidrome_smart_playlist_creator.py
    - Go to **Settings** -> **Activity / Library** -> **Quick Scan**.
 
 3. **Enjoy on TV**:
-   Open **Navidrome TV** on your LG TV! Your smart playlists will automatically cycle and surface in the **Top Picks** section every day at midnight.
+   Open **NaviOS** on your LG TV! Your smart playlists will automatically cycle and surface in the **Top Picks** section every day at midnight.
 
 ---
 
@@ -176,12 +176,12 @@ node scripts/pack-ipk.js
 ```
 
 The compiled package will be generated at:
-`dist-webos/org.navidrome.tv_X.X.X_all.ipk`
+`dist-webos/org.navios.tv_X.X.X_all.ipk`
 
 ### Installation to TV
 Install the `.ipk` file to your LG TV using **webOS Dev Manager** or via the official webOS CLI:
 ```bash
-ares-install dist-webos/org.navidrome.tv_1.0.31_all.ipk -d <your-tv-name>
+ares-install dist-webos/org.navios.tv_1.7.4_all.ipk -d <your-tv-name>
 ```
 
 ---

@@ -42,16 +42,21 @@
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.95) !important;
 }
 
-/* Top Pick Cards Focus (No scale/growth on focus) */
+/* Top Pick Cards Focus (No scale/grow animation for max performance, crisp focus ring only) */
+[data-focusable="true"][data-variant="topPick"] {
+  transition: box-shadow 0.08s ease-out !important;
+}
+
 [data-focusable="true"][data-variant="topPick"].focused {
   transform: none !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8), 0 0 0 3.5px rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.95) !important;
+  z-index: 30;
 }
 
 [data-focusable="true"][data-variant="topPick"].pressed,
 [data-focusable="true"][data-variant="topPick"]:active {
-  transform: scale3d(0.97, 0.97, 1) !important;
-  transition: transform 0.06s ease-out !important;
+  transform: none !important;
+  transition: none !important;
 }
 
 /* Card Tactile Press Down State (Keydown Enter / Active Click) */
@@ -208,19 +213,19 @@ button.is-added * {
   z-index: 20;
 }
 
-/* Up Next Queue Item Remove Button Focus */
+/* Up Next Queue Item Remove Button Focus (Matches Heart button style) */
 [data-section="nowPlayingQueue_remove"].focused {
-  background-color: #ef4444 !important;
-  color: #ffffff !important;
-  border-color: #ef4444 !important;
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.9), 0 0 0 3px rgba(255, 255, 255, 1) !important;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.9), 0 0 0 3.5px rgba(255, 255, 255, 1) !important;
   transform: scale3d(1.15, 1.15, 1) !important;
   z-index: 40;
 }
 
 [data-section="nowPlayingQueue_remove"].focused svg {
-  fill: #ffffff !important;
-  color: #ffffff !important;
+  stroke: #000000 !important;
+  color: #000000 !important;
 }
 
 /* Apple TV Style Exit Dialog Buttons */
