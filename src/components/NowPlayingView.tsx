@@ -134,7 +134,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
     return Array.from(map.values());
   });
 
-  const hasClear = createMemo(() => userQueue().length > 0);
+  const hasClear = createMemo(() => userQueue().length > 0 || upcomingContext().length > 0);
 
   async function handleToggleStar() {
     const t = track();
@@ -171,7 +171,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
   }
 
   function handleClearUserQueue() {
-    audioPlayer.clearUserQueue();
+    audioPlayer.clearQueue();
     setTimeout(() => {
       const firstItem = document.querySelector('[data-section="nowPlayingQueue"][data-index="0"]');
       if (firstItem) {
@@ -189,11 +189,8 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
 
   function handleRemoveContextItem(relIdx: number, e: Event) {
     e.stopPropagation();
-    const cq = contextQueue();
     const actualIdx = contextIndex() + 1 + relIdx;
-    if (actualIdx >= 0 && actualIdx < cq.length) {
-      audioPlayer.removeSongsFromQueue(new Set([cq[actualIdx].id]));
-    }
+    audioPlayer.removeFromContextQueueByIndex(actualIdx);
   }
 
   return (
@@ -386,13 +383,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                     <div class="flex flex-col w-full opacity-45 hover:opacity-80 transition-opacity">
                       <div
                         onClick={() => {
-                          const cq = contextQueue();
-                          const idx = cq.findIndex((s) => s.id === song.id);
-                          if (idx >= 0) {
-                            audioPlayer.jumpToContextIndex(idx);
-                          } else {
-                            audioPlayer.playTrack(song);
-                          }
+                          audioPlayer.playHistoryItem(song);
                         }}
                         class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-transparent text-neutral-300 hover:bg-neutral-800/60"
                         data-focusable="true"
@@ -545,7 +536,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                 <div class="flex items-center gap-4 my-3 px-3">
                   <div class="h-px bg-white/15 flex-1" />
                   <span class="text-xs font-bold tracking-wider text-neutral-400 uppercase">
-                    Continuing from {track()?.album || track()?.artist || 'Collection'}
+                    Resuming
                   </span>
                   <div class="h-px bg-white/15 flex-1" />
                 </div>
@@ -641,8 +632,8 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
         >
           <div class="w-full h-3.5 rounded-full bg-neutral-800/90 relative flex items-center overflow-hidden border border-white/10 [.focused_&]:border-white [.focused_&]:ring-2 [.focused_&]:ring-white">
             <div
-              class="h-full bg-white rounded-full transition-none"
-              style={{ width: `${progressPercent()}%` }}
+              class="absolute inset-y-0 left-0 w-full bg-white transition-none origin-left"
+              style={{ transform: `scaleX(${progressPercent() / 100})` }}
             />
           </div>
         </div>

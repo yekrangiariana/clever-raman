@@ -1,4 +1,5 @@
 import { DEV_CONFIG } from '../config/devConfig';
+import { initProfiles, getActiveProfile, setActiveProfileId, getProfiles, bumpSessionVersion } from './profiles';
 
 export interface ServerConfig {
   serverUrl: string;
@@ -63,7 +64,6 @@ export interface SearchResult {
 }
 
 const STORAGE_KEY = 'navios_config';
-const LEGACY_STORAGE_KEY = 'navidrome_tv_config';
 const API_VERSION = '1.16.1';
 const CLIENT_NAME = 'NaviOS';
 
@@ -83,7 +83,34 @@ class SubsonicApi {
   }
 
   public loadConfig(): ServerConfig | null {
-    // DEV_CONFIG always wins — hardcoded credentials take priority over anything stored.
+    initProfiles();
+    const activeProfile = getActiveProfile();
+
+    let serverUrl = '';
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.serverUrl) serverUrl = parsed.serverUrl;
+      }
+    } catch (e) {}
+
+    if (!serverUrl && activeProfile?.serverUrl) {
+      serverUrl = activeProfile.serverUrl;
+    }
+    if (!serverUrl && DEV_CONFIG?.serverUrl) {
+      serverUrl = DEV_CONFIG.serverUrl;
+    }
+
+    if (activeProfile && activeProfile.username && serverUrl) {
+      this.config = {
+        serverUrl: this.sanitizeUrl(serverUrl),
+        username: activeProfile.username,
+        password: activeProfile.password || '',
+      };
+      return this.config;
+    }
+
     if (DEV_CONFIG && DEV_CONFIG.serverUrl && DEV_CONFIG.username && DEV_CONFIG.password) {
       this.config = {
         serverUrl: DEV_CONFIG.serverUrl,
@@ -93,17 +120,25 @@ class SubsonicApi {
       return this.config;
     }
 
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (saved) {
-        this.config = JSON.parse(saved);
-        return this.config;
-      }
-    } catch (e) {
-      console.error('Failed to load Subsonic config', e);
-    }
-
     return null;
+  }
+
+  public switchProfile(profileId: string): boolean {
+    const profiles = getProfiles();
+    const target = profiles.find((p) => p.id === profileId);
+    if (!target) return false;
+
+    const currentServerUrl = this.config?.serverUrl || target.serverUrl || DEV_CONFIG?.serverUrl || '';
+
+    setActiveProfileId(target.id);
+    this.config = {
+      serverUrl: this.sanitizeUrl(currentServerUrl),
+      username: target.username,
+      password: target.password || '',
+    };
+    this.clearDetailsCache();
+    bumpSessionVersion();
+    return true;
   }
 
   public sanitizeUrl(url: string): string {

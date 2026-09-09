@@ -188,9 +188,9 @@ function createAudioPlayer() {
     showToast(label);
   }
 
-  function startPlaybackStream(track: Song) {
+  function startPlaybackStream(track: Song, isRewind = false) {
     const prevTrack = currentTrack();
-    if (prevTrack && prevTrack.id !== track.id) {
+    if (prevTrack && prevTrack.id !== track.id && !isRewind) {
       recordHistory(prevTrack);
     }
     setCurrentTrack(track);
@@ -308,19 +308,54 @@ function createAudioPlayer() {
       return;
     }
 
+    const history = playedHistory();
     const cq = contextQueue();
-    if (cq.length === 0) return;
 
+    if (history.length > 0) {
+      const prevTrack = history[history.length - 1];
+      const newHistory = history.slice(0, -1);
+      setPlayedHistory(newHistory);
+
+      const currTrack = currentTrack();
+      if (currTrack) {
+        const currCqIdx = cq.findIndex((s) => s.id === currTrack.id);
+        if (currCqIdx === -1) {
+          setUserQueue([currTrack, ...userQueue()]);
+        }
+      }
+
+      const prevCqIdx = cq.findIndex((s) => s.id === prevTrack.id);
+      if (prevCqIdx >= 0) {
+        setContextIndex(prevCqIdx);
+      } else {
+        let lastContextIdx = -1;
+        for (let i = newHistory.length - 1; i >= 0; i--) {
+          const idxInCq = cq.findIndex((s) => s.id === newHistory[i].id);
+          if (idxInCq >= 0) {
+            lastContextIdx = idxInCq;
+            break;
+          }
+        }
+        setContextIndex(lastContextIdx);
+      }
+
+      startPlaybackStream(prevTrack, true);
+      return;
+    }
+
+    if (cq.length === 0) return;
     let prevIdx = contextIndex() - 1;
     if (prevIdx < 0) {
       if (repeatMode() === 'all') {
         prevIdx = cq.length - 1;
       } else {
         prevIdx = 0;
+        audio.currentTime = 0;
+        return;
       }
     }
     setContextIndex(prevIdx);
-    startPlaybackStream(cq[prevIdx]);
+    startPlaybackStream(cq[prevIdx], true);
   }
 
   function nextTrack() {
@@ -483,8 +518,19 @@ function createAudioPlayer() {
   function jumpToContextIndex(index: number) {
     const cq = contextQueue();
     if (index >= 0 && index < cq.length) {
+      const isRewind = index < contextIndex();
+      
+      if (isRewind) {
+        const history = playedHistory();
+        const targetSong = cq[index];
+        const hIdx = history.findIndex((s) => s.id === targetSong.id);
+        if (hIdx >= 0) {
+          setPlayedHistory(history.slice(0, hIdx));
+        }
+      }
+      
       setContextIndex(index);
-      startPlaybackStream(cq[index]);
+      startPlaybackStream(cq[index], isRewind);
     }
   }
 
@@ -514,6 +560,17 @@ function createAudioPlayer() {
 
   function clearQueue() {
     clearUserQueue();
+    const cIdx = contextIndex();
+    setContextQueue(contextQueue().slice(0, cIdx + 1));
+  }
+
+  function removeFromContextQueueByIndex(actualIdx: number) {
+    const cq = contextQueue();
+    if (actualIdx >= 0 && actualIdx < cq.length) {
+      const newCq = [...cq];
+      newCq.splice(actualIdx, 1);
+      setContextQueue(newCq);
+    }
   }
 
   function jumpToQueueIndex(index: number) {
@@ -526,6 +583,46 @@ function createAudioPlayer() {
       const contextOffset = index - uq.length;
       const targetCtxIdx = contextIndex() + 1 + contextOffset;
       jumpToContextIndex(targetCtxIdx);
+    }
+  }
+
+  function playHistoryItem(song: Song) {
+    const history = playedHistory();
+    const hIdx = history.findIndex((s) => s.id === song.id);
+    if (hIdx >= 0) {
+      const newHistory = history.slice(0, hIdx);
+      const tracksToRequeue = history.slice(hIdx + 1);
+      setPlayedHistory(newHistory);
+
+      const cq = contextQueue();
+      const currTrack = currentTrack();
+
+      const customTracksToRequeue = tracksToRequeue.filter((s) => cq.findIndex((x) => x.id === s.id) === -1);
+      
+      if (currTrack && cq.findIndex((s) => s.id === currTrack.id) === -1) {
+        customTracksToRequeue.push(currTrack);
+      }
+
+      if (customTracksToRequeue.length > 0) {
+        setUserQueue([...customTracksToRequeue, ...userQueue()]);
+      }
+
+      const prevCqIdx = cq.findIndex((s) => s.id === song.id);
+      if (prevCqIdx >= 0) {
+        setContextIndex(prevCqIdx);
+      } else {
+        let lastContextIdx = -1;
+        for (let i = newHistory.length - 1; i >= 0; i--) {
+          const idxInCq = cq.findIndex((s) => s.id === newHistory[i].id);
+          if (idxInCq >= 0) {
+            lastContextIdx = idxInCq;
+            break;
+          }
+        }
+        setContextIndex(lastContextIdx);
+      }
+
+      startPlaybackStream(song, true);
     }
   }
 
@@ -550,6 +647,7 @@ function createAudioPlayer() {
     removeFromQueue,
     removeFromUserQueue,
     removeFromUserQueueByIndex,
+    removeFromContextQueueByIndex,
     removeFromQueueBySongId,
     removeSongsFromQueue,
     isSongInQueue,
@@ -560,6 +658,7 @@ function createAudioPlayer() {
     jumpToQueueIndex,
     jumpToUserQueueIndex,
     jumpToContextIndex,
+    playHistoryItem,
     toggleShuffle,
     toggleRepeatMode,
     playTrack,

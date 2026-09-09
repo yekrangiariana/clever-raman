@@ -1,7 +1,8 @@
-import { Component, createSignal, onMount, onCleanup } from 'solid-js';
+import { Component, createSignal, onMount, onCleanup, Show, For, createEffect } from 'solid-js';
 import { api, Album, Playlist } from './services/api';
 import { audioPlayer } from './services/audio';
 import { focusEngine } from './services/focus';
+import { getProfiles, sessionVersionSignal, getShowBootSelector, editingProfileSignal, setEditingProfileSignal, addProfileReturnState, setAddProfileReturnState } from './services/profiles';
 import { AmbientGlow } from './components/AmbientGlow';
 import { TopBar } from './components/TopBar';
 import { HomeView, prefetchHomeData } from './components/HomeView';
@@ -11,6 +12,9 @@ import { AlbumDetailView } from './components/AlbumDetailView';
 import { NowPlayingView } from './components/NowPlayingView';
 import { SearchView } from './components/SearchView';
 import { SettingsView } from './components/SettingsView';
+import { ProfileSelectorModal } from './components/ProfileSelectorModal';
+import { QuickProfileSwitcher } from './components/QuickProfileSwitcher';
+import { AddProfileModal } from './components/AddProfileModal';
 
 import { ToastNotification } from './components/common/ToastNotification';
 import { ExitConfirmModal } from './components/common/ExitConfirmModal';
@@ -40,25 +44,38 @@ export const App: Component = () => {
       focusEngine.setFocus('settings', 0);
       setTimeout(dismissSplash, 500);
     } else {
-      focusEngine.setFocus('topBar', 0);
+      const profiles = getProfiles();
+      
+      const skipBootSelector = sessionStorage.getItem('skipBootSelector');
+      if (skipBootSelector) {
+        sessionStorage.removeItem('skipBootSelector');
+      }
 
-      // Fast, lightweight boot warming:
-      // Minimum display time (600ms) prevents abrupt flicker.
-      // Maximum safety ceiling (2500ms) guarantees the splash screen NEVER hangs.
-      const minDisplayPromise = new Promise<void>((resolve) => setTimeout(resolve, 600));
-      const safetyTimeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2500));
+      const shouldShowBootSelector = getShowBootSelector() && profiles.length > 1 && !skipBootSelector;
 
-      const prefetchPromise = prefetchHomeData();
+      if (shouldShowBootSelector) {
+        focusEngine.setActiveModal('profileSelector');
+        setTimeout(() => focusEngine.setFocus('profileSelector', 0), 50);
+        setTimeout(dismissSplash, 500);
+      } else {
+        focusEngine.setFocus('topBar', 0);
 
-      Promise.race([
-        Promise.all([minDisplayPromise, prefetchPromise]),
-        safetyTimeoutPromise,
-      ]).then(() => {
-        dismissSplash();
-        // Lazily warm the album grid cache 3s after home loads — so navigating
-        // to the Albums tab feels instant without competing with home startup.
-        setTimeout(() => prefetchAlbums(), 3000);
-      });
+        const minDisplayPromise = new Promise<void>((resolve) => setTimeout(resolve, 600));
+        const safetyTimeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2500));
+        const prefetchPromise = prefetchHomeData();
+
+        Promise.race([
+          Promise.all([minDisplayPromise, prefetchPromise]),
+          safetyTimeoutPromise,
+        ]).then(() => {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              dismissSplash();
+              setTimeout(() => prefetchAlbums(), 3000);
+            }, 50);
+          });
+        });
+      }
     }
 
     window.addEventListener('keydown', focusEngine.handleKeyDown);
@@ -170,41 +187,46 @@ export const App: Component = () => {
       >
         <TopBar />
 
-        {focusEngine.activeModal() === 'albumDetail' && (selectedAlbum() || selectedPlaylist() || selectedMixGenre()) ? (
-          <AlbumDetailView
-            albumId={selectedAlbum()?.id}
-            playlistId={selectedPlaylist()?.id}
-            mixGenre={selectedMixGenre()}
-            initialAlbum={selectedAlbum()}
-            initialPlaylist={selectedPlaylist()}
-            customCoverVariant={selectedCoverVariant()}
-            onClose={handleCloseDetail}
-          />
-        ) : focusEngine.activeTab() === 'home' ? (
-          <HomeView
-            onSelectAlbum={handleSelectAlbum}
-            onSelectGenre={handleSelectGenre}
-            onSelectMix={handleSelectMix}
-            onSelectPlaylist={handleSelectPlaylist}
-          />
-        ) : focusEngine.activeTab() === 'search' ? (
-          <SearchView
-            onSelectAlbum={handleSelectAlbum}
-            onSelectGenre={handleSelectGenre}
-            onSelectArtist={handleSelectArtist}
-          />
-        ) : focusEngine.activeTab() === 'playlists' ? (
-          <PlaylistsView onSelectPlaylist={handleSelectPlaylist} />
-        ) : focusEngine.activeTab() === 'settings' ? (
-          <SettingsView />
-        ) : (
-          <MainGrid
-            onSelectAlbum={handleSelectAlbum}
-            selectedGenre={selectedGenre()}
-            selectedArtist={selectedArtist()}
-            onClearFilter={handleClearFilter}
-          />
-        )}
+        <Show
+          when={focusEngine.activeModal() !== 'albumDetail'}
+          fallback={
+            <AlbumDetailView
+              albumId={selectedAlbum()?.id}
+              playlistId={selectedPlaylist()?.id}
+              mixGenre={selectedMixGenre()}
+              initialAlbum={selectedAlbum()}
+              initialPlaylist={selectedPlaylist()}
+              customCoverVariant={selectedCoverVariant()}
+              onClose={handleCloseDetail}
+            />
+          }
+        >
+          {focusEngine.activeTab() === 'home' ? (
+            <HomeView
+              onSelectAlbum={handleSelectAlbum}
+              onSelectGenre={handleSelectGenre}
+              onSelectMix={handleSelectMix}
+              onSelectPlaylist={handleSelectPlaylist}
+            />
+          ) : focusEngine.activeTab() === 'search' ? (
+            <SearchView
+              onSelectAlbum={handleSelectAlbum}
+              onSelectGenre={handleSelectGenre}
+              onSelectArtist={handleSelectArtist}
+            />
+          ) : focusEngine.activeTab() === 'playlists' ? (
+            <PlaylistsView onSelectPlaylist={handleSelectPlaylist} />
+          ) : focusEngine.activeTab() === 'settings' ? (
+            <SettingsView />
+          ) : (
+            <MainGrid
+              onSelectAlbum={handleSelectAlbum}
+              selectedGenre={selectedGenre()}
+              selectedArtist={selectedArtist()}
+              onClearFilter={handleClearFilter}
+            />
+          )}
+        </Show>
       </div>
 
       {focusEngine.activeModal() === 'nowPlaying' && (
@@ -213,6 +235,71 @@ export const App: Component = () => {
           backLabel={nowPlayingBackLabel()}
         />
       )}
+
+      <Show when={focusEngine.activeModal() === 'profileSelector'}>
+        <ProfileSelectorModal
+          onClose={() => {
+            focusEngine.setActiveModal('none');
+            focusEngine.setFocus('topBar', 0);
+          }}
+          onOpenAddProfile={() => {
+            setEditingProfileSignal(null);
+            setAddProfileReturnState('selector');
+            focusEngine.setActiveModal('addProfileModal');
+          }}
+        />
+      </Show>
+
+      <Show when={focusEngine.activeModal() === 'profileQuickMenu'}>
+        <QuickProfileSwitcher
+          onClose={() => {
+            focusEngine.setActiveModal('none');
+            focusEngine.setFocus('topBar', 6);
+          }}
+          onOpenAddProfile={() => {
+            setEditingProfileSignal(null);
+            setAddProfileReturnState('topBar');
+            focusEngine.setActiveModal('addProfileModal');
+          }}
+          onManageProfiles={() => {
+            focusEngine.setActiveModal('none');
+            focusEngine.setActiveTab('settings');
+            setTimeout(() => focusEngine.setFocus('settings', 2), 50);
+          }}
+        />
+      </Show>
+
+      <Show when={focusEngine.activeModal() === 'addProfileModal'}>
+        <AddProfileModal
+          initialProfile={editingProfileSignal()}
+          onClose={() => {
+            focusEngine.setActiveModal('none');
+            setEditingProfileSignal(null);
+            if (addProfileReturnState() === 'settings') {
+              focusEngine.setActiveTab('settings');
+              setTimeout(() => focusEngine.setFocus('settings', 2), 50);
+            } else if (addProfileReturnState() === 'selector') {
+              focusEngine.setActiveModal('profileSelector');
+              setTimeout(() => focusEngine.setFocus('profileSelector', 0), 50);
+            } else {
+              focusEngine.setFocus('topBar', 0);
+            }
+          }}
+          onSaved={() => {
+            focusEngine.setActiveModal('none');
+            setEditingProfileSignal(null);
+            if (addProfileReturnState() === 'settings') {
+              focusEngine.setActiveTab('settings');
+              setTimeout(() => focusEngine.setFocus('settings', 2), 50);
+            } else if (addProfileReturnState() === 'selector') {
+              focusEngine.setActiveModal('profileSelector');
+              setTimeout(() => focusEngine.setFocus('profileSelector', 0), 50);
+            } else {
+              focusEngine.setFocus('topBar', 0);
+            }
+          }}
+        />
+      </Show>
 
       <ExitConfirmModal />
     </div>

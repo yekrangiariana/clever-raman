@@ -1,8 +1,9 @@
-import { Component, For, Show, createResource, createEffect, createSignal } from 'solid-js';
+import { Component, For, Show, createEffect, createSignal, onMount, onCleanup } from 'solid-js';
 import { api, Album } from '../services/api';
 import { focusEngine } from '../services/focus';
 import { AlbumCard } from './common/AlbumCard';
 import { ArrowLeftIcon } from './common/Icons';
+import { sessionVersionSignal } from '../services/profiles';
 
 export type AlbumSortFilter = 'alphabeticalByName' | 'starred' | 'newest';
 
@@ -20,6 +21,7 @@ interface MainGridProps {
 }
 
 const albumCache = new Map<string, Album[]>();
+let globalCurrentFilter: AlbumSortFilter = 'alphabeticalByName';
 
 export function clearAlbumCache() {
   albumCache.clear();
@@ -27,7 +29,7 @@ export function clearAlbumCache() {
 
 // Keep cache small to prevent memory leaks on TVs
 function setAlbumCache(key: string, list: Album[]) {
-  if (albumCache.size >= 8) {
+  if (albumCache.size >= 16) {
     const firstKey = albumCache.keys().next().value;
     if (firstKey) albumCache.delete(firstKey);
   }
@@ -36,11 +38,11 @@ function setAlbumCache(key: string, list: Album[]) {
 
 export async function prefetchAlbums(): Promise<void> {
   if (!api.isConfigured()) return;
-  const cacheKey = 'all_alphabeticalByName_500';
+  const cacheKey = 'all_alphabeticalByName_50';
   if (albumCache.has(cacheKey) && albumCache.get(cacheKey)!.length > 0) return;
 
   try {
-    const list = await api.getAlbumList('alphabeticalByName', 500, 0);
+    const list = await api.getAlbumList('alphabeticalByName', 50, 0);
     if (list && list.length > 0) {
       setAlbumCache(cacheKey, list);
     }
@@ -50,46 +52,96 @@ export async function prefetchAlbums(): Promise<void> {
 }
 
 export const MainGrid: Component<MainGridProps> = (props) => {
-  const [currentFilter, setCurrentFilter] = createSignal<AlbumSortFilter>('alphabeticalByName');
+  const [currentFilter, setCurrentFilter] = createSignal<AlbumSortFilter>(globalCurrentFilter);
+  const [albums, setAlbums] = createSignal<Album[]>([]);
+  const [isLoading, setIsLoading] = createSignal(false);
+  const [isFetchingMore, setIsFetchingMore] = createSignal(false);
+  const [hasMore, setHasMore] = createSignal(true);
+  const [pageOffset, setPageOffset] = createSignal(0);
 
-  const resourceSource = () => ({
-    tab: focusEngine.activeTab(),
-    configured: api.isConfigured(),
-    configKey: api.getConfig()?.serverUrl || '',
-    genre: props.selectedGenre || '',
-    artist: props.selectedArtist || '',
-    filter: currentFilter(),
+  let loadTriggerRef: HTMLDivElement | undefined;
+
+  const fetchData = async (reset: boolean) => {
+    if (reset) {
+      setPageOffset(0);
+      setAlbums([]);
+      setHasMore(true);
+      setIsLoading(true);
+    } else {
+      setIsFetchingMore(true);
+    }
+
+    try {
+      if (!api.isConfigured()) return;
+
+      let type: 'alphabeticalByName' | 'byGenre' | 'starred' | 'newest' = 'alphabeticalByName';
+      if (props.selectedGenre) {
+        type = 'byGenre';
+      } else {
+        type = currentFilter();
+      }
+      
+      const currentOffset = reset ? 0 : pageOffset();
+      let list: Album[] = [];
+      const cacheKey = `${props.selectedGenre || 'all'}_${type}_${currentOffset}`;
+
+      if (albumCache.has(cacheKey) && albumCache.get(cacheKey)!.length > 0) {
+        list = albumCache.get(cacheKey)!;
+      } else {
+        list = await api.getAlbumList(type, 50, currentOffset, props.selectedGenre || undefined);
+        if (list && list.length > 0) setAlbumCache(cacheKey, list);
+      }
+
+      if (props.selectedArtist) {
+        list = list.filter((a) => a.artist === props.selectedArtist);
+      }
+
+      if (list.length < 50) {
+        setHasMore(false);
+      }
+
+      if (reset) {
+        setAlbums(list);
+      } else {
+        setAlbums((prev) => [...prev, ...list]);
+      }
+      
+      setPageOffset(currentOffset + 50);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+      setIsFetchingMore(false);
+    }
+  };
+
+  createEffect(() => {
+    // Re-run whenever these props change
+    const _genre = props.selectedGenre;
+    const _artist = props.selectedArtist;
+    const _filter = currentFilter();
+    const _version = sessionVersionSignal();
+    const _configured = api.isConfigured();
+    
+    if (_configured) {
+      fetchData(true);
+    }
   });
 
-  const [albums] = createResource(resourceSource, async ({ configured, genre, artist, filter }) => {
-    if (!configured || !api.isConfigured()) return [];
-
-    let type: 'alphabeticalByName' | 'byGenre' | 'starred' | 'newest' = 'alphabeticalByName';
-    if (genre) {
-      type = 'byGenre';
-    } else {
-      type = filter;
-    }
-
-    const cacheKey = `${genre || 'all'}_${type}_500`;
-    let list: Album[] = [];
-
-    if (albumCache.has(cacheKey) && albumCache.get(cacheKey)!.length > 0) {
-      list = albumCache.get(cacheKey)!;
-    } else {
-      list = await api.getAlbumList(type, 500, 0, genre || undefined);
-      if (list && list.length > 0) setAlbumCache(cacheKey, list);
-    }
-
-    if (artist) {
-      list = list.filter((a) => a.artist === artist);
-    }
-
-    return list;
+  onMount(() => {
+    if (!loadTriggerRef) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore() && !isFetchingMore() && !isLoading()) {
+        fetchData(false);
+      }
+    }, { rootMargin: '800px' }); // Load 800px before reaching the bottom
+    observer.observe(loadTriggerRef);
+    onCleanup(() => observer.disconnect());
   });
 
   createEffect(() => {
     focusEngine.setGridColumns(5);
+    focusEngine.setSectionLength('grid', albums().length);
   });
 
   const isFiltered = () => !!(props.selectedArtist || props.selectedGenre);
@@ -136,6 +188,7 @@ export const MainGrid: Component<MainGridProps> = (props) => {
                 return (
                   <button
                     onClick={() => {
+                      globalCurrentFilter = opt.id;
                       setCurrentFilter(opt.id);
                       focusEngine.setFocus('albumFilters', index());
                     }}
@@ -159,31 +212,25 @@ export const MainGrid: Component<MainGridProps> = (props) => {
 
         <Show when={isFiltered()}>
           <p class="text-2xl text-neutral-400 font-semibold">
-            {albums()?.length || 0} {albums()?.length === 1 ? 'album' : 'albums'} found
+            {albums().length || 0} {albums().length === 1 ? 'album' : 'albums'} found
           </p>
         </Show>
       </div>
 
-      {albums.loading && !albums()?.length && (
+      {isLoading() && albums().length === 0 && (
         <div class="flex items-center justify-center h-64">
           <div class="text-3xl text-neutral-400 animate-pulse font-bold">Loading music library...</div>
         </div>
       )}
 
-      {albums.error && (
-        <div class="p-10 rounded-3xl bg-red-950/60 border border-red-800 text-red-200 text-3xl font-bold">
-          Error loading albums: {String(albums.error)}
-        </div>
-      )}
-
-      {!albums.loading && albums()?.length === 0 && (
+      {!isLoading() && albums().length === 0 && (
         <div class="flex items-center justify-center h-64 text-neutral-400 text-3xl font-semibold">
           No albums found.
         </div>
       )}
 
-      {albums() && albums()!.length > 0 && (
-        <div class="grid grid-cols-5 gap-10 pb-24">
+      {albums().length > 0 && (
+        <div class="grid grid-cols-5 gap-10 pb-8">
           <For each={albums()}>
             {(album, index) => (
               <AlbumCard
@@ -197,6 +244,13 @@ export const MainGrid: Component<MainGridProps> = (props) => {
           </For>
         </div>
       )}
+
+      {/* Infinite Scroll Trigger & Loader */}
+      <div ref={loadTriggerRef} class="w-full h-32 flex items-center justify-center">
+        <Show when={isFetchingMore()}>
+          <div class="w-12 h-12 rounded-full border-4 border-white/20 border-t-white animate-spin" />
+        </Show>
+      </div>
     </main>
   );
 };

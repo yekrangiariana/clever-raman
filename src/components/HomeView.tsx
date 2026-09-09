@@ -6,6 +6,7 @@ import { AlbumCard } from './common/AlbumCard';
 import { TrackCard } from './common/TrackCard';
 import { TopPickCard } from './common/TopPickCard';
 import { SectionHeader } from './common/SectionHeader';
+import { sessionVersionSignal } from '../services/profiles';
 
 interface HomeViewProps {
   onSelectAlbum: (album: Album) => void;
@@ -122,6 +123,7 @@ export const HomeView: Component<HomeViewProps> = (props) => {
   const resourceSource = () => ({
     configured: api.isConfigured(),
     configKey: api.getConfig()?.serverUrl || '',
+    version: sessionVersionSignal(),
   });
 
   const [homeData] = createResource(resourceSource, async ({ configured }) => {
@@ -130,11 +132,21 @@ export const HomeView: Component<HomeViewProps> = (props) => {
     }
     const data = await prefetchHomeData();
     return data || { newest: [], starred: [], starredTracks: [], random: [], genres: [], playlists: [] };
-  }, { initialValue: cachedHomeData || undefined });
+  });
 
   createEffect(() => {
     // Set 5 columns grid layout for larger cards and smooth navigation
     focusEngine.setGridColumns(5);
+    const data = homeData();
+    if (data) {
+      const total = 
+        dailyTopPicks().length + 
+        data.starred.length + 
+        data.starredTracks.length + 
+        data.newest.length + 
+        data.random.length;
+      focusEngine.setSectionLength('grid', total);
+    }
   });
 
   // Dynamic daily category generator (Returns 4 items) memoized to avoid redundant computation

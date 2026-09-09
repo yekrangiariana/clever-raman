@@ -150,11 +150,20 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
   const [visibleLimit, setVisibleLimit] = createSignal(50);
   createEffect(() => {
     const songs = data().songs;
+    
+    // Set focus engine length dynamically
+    // Header buttons (Play, Shuffle) = 2. Then tracks.
+    if (songs) {
+      focusEngine.setSectionLength('albumDetail', 2 + songs.length);
+    } else {
+      focusEngine.setSectionLength('albumDetail', 2);
+    }
+
     setVisibleLimit(50);
     if (songs && songs.length > 50) {
       const timer = setTimeout(() => {
         setVisibleLimit(songs.length);
-      }, 100);
+      }, 400);
       onCleanup(() => clearTimeout(timer));
     }
   });
@@ -282,7 +291,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
               style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #ea580c 50%, #e11d48 100%)' }}
             >
               <div
-                class="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay"
+                class="absolute inset-0 pointer-events-none opacity-10"
                 style={{ 'background-image': 'url(./noise.png)', 'background-repeat': 'repeat' }}
               />
               <div class="absolute top-4 right-5 text-white font-black text-sm opacity-90 tracking-tight">NaviOS</div>
@@ -315,7 +324,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
               style={{ background: 'linear-gradient(145deg, #7c3aed 0%, #a855f7 45%, #4338ca 100%)' }}
             >
               <div
-                class="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay"
+                class="absolute inset-0 pointer-events-none opacity-10"
                 style={{ 'background-image': 'url(./noise.png)', 'background-repeat': 'repeat' }}
               />
               <div class="absolute top-4 right-5 text-white font-black text-sm opacity-90 tracking-tight">NaviOS</div>

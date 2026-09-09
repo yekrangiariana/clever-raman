@@ -1,10 +1,11 @@
-import { Component, For, createSignal, createResource, onCleanup } from 'solid-js';
+import { Component, For, createSignal, createEffect, createResource, onCleanup } from 'solid-js';
 import { api, Album, Song, Genre } from '../services/api';
 import { audioPlayer } from '../services/audio';
 import { focusEngine } from '../services/focus';
 import { AlbumCard } from './common/AlbumCard';
 import { SongRow } from './common/SongRow';
 import { SearchIcon, ChevronRightIcon, BackspaceIcon } from './common/Icons';
+import { sessionVersionSignal } from '../services/profiles';
 
 interface SearchViewProps {
   onSelectAlbum: (album: Album) => void;
@@ -59,7 +60,7 @@ export const SearchView: Component<SearchViewProps> = (props) => {
   ];
 
   // Fetch real genres for browse state
-  const [genres] = createResource(async () => {
+  const [genres] = createResource(sessionVersionSignal, async () => {
     if (cachedGenres) return cachedGenres;
     try {
       cachedGenres = await api.getGenres();
@@ -70,7 +71,7 @@ export const SearchView: Component<SearchViewProps> = (props) => {
   });
 
   // Fetch real artists list from albums for browse state
-  const [artists] = createResource(async () => {
+  const [artists] = createResource(sessionVersionSignal, async () => {
     if (cachedArtists) return cachedArtists;
     try {
       const albums = await api.getAlbumList('alphabeticalByName', 500, 0);
@@ -86,7 +87,8 @@ export const SearchView: Component<SearchViewProps> = (props) => {
   });
 
   // Fetch live search results via search3.view with fallback (debounced)
-  const [searchResults] = createResource(debouncedQuery, async (query) => {
+  const resourceSource = () => ({ query: debouncedQuery(), version: sessionVersionSignal() });
+  const [searchResults] = createResource(resourceSource, async ({ query }) => {
     if (!query || query.trim().length === 0) return null;
     try {
       return await api.search3(query);
@@ -122,6 +124,26 @@ export const SearchView: Component<SearchViewProps> = (props) => {
     focusEngine.setActiveModal('nowPlaying');
     focusEngine.setFocus('nowPlaying', 2);
   }
+
+  createEffect(() => {
+    // Set section lengths dynamically for fast spatial navigation
+    focusEngine.setSectionLength('search_mode', 2);
+    focusEngine.setSectionLength('search_kbd', 29); // 24 keys + 5 action buttons
+    focusEngine.setSectionLength('search_tabs', 2);
+    
+    if (searchResults.latest) {
+      focusEngine.setSectionLength(
+        'search_results',
+        searchResults.latest.albums.length + searchResults.latest.songs.length
+      );
+    } else if (browseTab() === 'genres' && genres.latest) {
+      focusEngine.setSectionLength('search_results', genres.latest.length);
+    } else if (browseTab() === 'artists' && artists.latest) {
+      focusEngine.setSectionLength('search_results', artists.latest.length);
+    } else {
+      focusEngine.setSectionLength('search_results', 0);
+    }
+  });
 
   async function handleToggleStar(song: Song, e: Event) {
     e.stopPropagation();

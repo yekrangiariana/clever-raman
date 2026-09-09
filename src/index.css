@@ -45,12 +45,11 @@
 /* Top Pick Cards Focus (Zero animations/fade-in, instant 0ms white border ring) */
 [data-focusable="true"][data-variant="topPick"] {
   transition: none !important;
-  transform: translateZ(0) !important;
-  will-change: transform !important;
+  transform: none !important;
 }
 
 [data-focusable="true"][data-variant="topPick"].focused {
-  transform: translateZ(0) !important;
+  transform: none !important;
   transition: none !important;
   box-shadow: 0 0 0 4px #ffffff !important;
   z-index: 30;
@@ -58,7 +57,7 @@
 
 [data-focusable="true"][data-variant="topPick"].pressed,
 [data-focusable="true"][data-variant="topPick"]:active {
-  transform: translateZ(0) !important;
+  transform: none !important;
   transition: none !important;
 }
 
@@ -72,7 +71,6 @@
 
 /* Seek Bar Focus & Press Override (Dimensions & length must stay 100% fixed) */
 [data-focusable="true"][data-variant="seekBar"],
-[data-focusable="true"][data-variant="seekBar"] *,
 [data-focusable="true"][data-variant="seekBar"].focused,
 [data-focusable="true"][data-variant="seekBar"].pressed,
 [data-focusable="true"][data-variant="seekBar"]:active,

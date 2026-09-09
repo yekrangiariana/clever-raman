@@ -1,7 +1,7 @@
 import { createSignal, createRoot } from 'solid-js';
 import { audioPlayer } from './audio';
 
-export type FocusSection = 'topBar' | 'grid' | 'albumDetail' | 'nowPlaying' | 'nowPlayingQueue' | 'nowPlayingQueue_header' | 'nowPlayingQueue_remove' | 'setup' | 'search' | 'search_mode' | 'search_kbd' | 'search_tabs' | 'search_results' | 'settings' | 'settingsModal' | 'exitConfirm' | 'albumFilters';
+export type FocusSection = 'topBar' | 'grid' | 'albumDetail' | 'nowPlaying' | 'nowPlayingQueue' | 'nowPlayingQueue_header' | 'nowPlayingQueue_remove' | 'setup' | 'search' | 'search_mode' | 'search_kbd' | 'search_tabs' | 'search_results' | 'settings' | 'settingsModal' | 'exitConfirm' | 'albumFilters' | 'profileSelector' | 'profileQuickMenu' | 'addProfileModal';
 
 export interface FocusLocation {
   section: FocusSection;
@@ -15,13 +15,19 @@ function createFocusEngine() {
   });
 
   const [activeTab, setActiveTab] = createSignal<'home' | 'albums' | 'playlists' | 'nowPlaying' | 'search' | 'settings'>('home');
-  const [activeModal, setActiveModal] = createSignal<'none' | 'nowPlaying' | 'albumDetail' | 'settingsServer' | 'settingsAccount' | 'exitConfirm'>('none');
+  const [activeModal, setActiveModal] = createSignal<'none' | 'nowPlaying' | 'albumDetail' | 'settingsServer' | 'settingsAccount' | 'exitConfirm' | 'profileSelector' | 'profileQuickMenu' | 'addProfileModal' | 'setup'>('none');
   const [selectedAlbumId, setSelectedAlbumId] = createSignal<string | null>(null);
 
   let gridColumns = 4;
   let lastFocusedElement: HTMLElement | null = null;
   let cachedHomeRowRanges: { start: number; count: number }[] | null = null;
   let lastHomeRowComputeTime = 0;
+  
+  const sectionLengths = new Map<string, number>();
+
+  function setSectionLength(section: FocusSection, length: number) {
+    sectionLengths.set(section, length);
+  }
 
   function setGridColumns(cols: number) {
     gridColumns = cols;
@@ -92,8 +98,11 @@ function createFocusEngine() {
             scrollParent = scrollParent.parentElement;
           }
 
-          const allSectionElements = document.querySelectorAll(`[data-focusable="true"][data-section="${section}"]`);
-          const totalCount = allSectionElements.length;
+          let totalCount = sectionLengths.get(section);
+          if (totalCount === undefined) {
+            const allSectionElements = document.querySelectorAll(`[data-focusable="true"][data-section="${section}"]`);
+            totalCount = allSectionElements.length;
+          }
 
           // Universal last row detection across all grid views
           let isLastRow = false;
@@ -172,6 +181,9 @@ function createFocusEngine() {
       }
 
       if (target.tagName !== 'INPUT') {
+        if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement !== target) {
+          (document.activeElement as HTMLElement).blur();
+        }
         target.focus({ preventScroll: true });
       }
     }
@@ -215,8 +227,12 @@ function createFocusEngine() {
     }
 
     const { section, index } = currentLocation();
-    const focusableInSection = document.querySelectorAll(`[data-focusable="true"][data-section="${section}"]`);
-    const totalCount = focusableInSection.length;
+    
+    let totalCount = sectionLengths.get(section);
+    if (totalCount === undefined) {
+      const focusableInSection = document.querySelectorAll(`[data-focusable="true"][data-section="${section}"]`);
+      totalCount = focusableInSection.length;
+    }
 
     switch (keyCode) {
       case 38: // UP
@@ -425,6 +441,18 @@ function createFocusEngine() {
       if (index > 0) setFocus('settingsModal', index - 1);
     } else if (section === 'exitConfirm') {
       if (index > 0) setFocus('exitConfirm', index - 1);
+    } else if (section === 'profileSelector') {
+      if (index > 0) setFocus('profileSelector', index - 1);
+    } else if (section === 'profileQuickMenu') {
+      if (index > 0) setFocus('profileQuickMenu', index - 1);
+    } else if (section === 'addProfileModal') {
+      if (index >= 9) {
+        setFocus('addProfileModal', 3);
+      } else if (index >= 3) {
+        setFocus('addProfileModal', 1);
+      } else if (index === 1 || index === 2) {
+        setFocus('addProfileModal', 0);
+      }
     }
   }
 
@@ -531,6 +559,20 @@ function createFocusEngine() {
       if (index < totalCount - 1) setFocus('settingsModal', index + 1);
     } else if (section === 'exitConfirm') {
       if (index < totalCount - 1) setFocus('exitConfirm', index + 1);
+    } else if (section === 'profileSelector') {
+      if (index < totalCount - 1) setFocus('profileSelector', index + 1);
+    } else if (section === 'profileQuickMenu') {
+      if (index < totalCount - 1) setFocus('profileQuickMenu', index + 1);
+    } else if (section === 'addProfileModal') {
+      if (index === 0) {
+        setFocus('addProfileModal', 1);
+      } else if (index === 1 || index === 2) {
+        setFocus('addProfileModal', 3);
+      } else if (index >= 3 && index < 9) {
+        setFocus('addProfileModal', 9);
+      } else if (index >= 9 && index < totalCount - 1) {
+        setFocus('addProfileModal', index + 1);
+      }
     }
   }
 
@@ -611,6 +653,16 @@ function createFocusEngine() {
       if (index > 0) setFocus('exitConfirm', index - 1);
     } else if (section === 'albumFilters') {
       if (index > 0) setFocus('albumFilters', index - 1);
+    } else if (section === 'profileSelector') {
+      if (index > 0) setFocus('profileSelector', index - 1);
+    } else if (section === 'addProfileModal') {
+      if (index === 2) {
+        setFocus('addProfileModal', 1);
+      } else if (index >= 3 && index <= 8) {
+        if (index > 3) setFocus('addProfileModal', index - 1);
+      } else if (index > 9 && index < totalCount) {
+        setFocus('addProfileModal', index - 1);
+      }
     }
   }
 
@@ -717,11 +769,53 @@ function createFocusEngine() {
       if (index < totalCount - 1) setFocus('exitConfirm', index + 1);
     } else if (section === 'albumFilters') {
       if (index < totalCount - 1) setFocus('albumFilters', index + 1);
+    } else if (section === 'profileSelector') {
+      if (index < totalCount - 1) setFocus('profileSelector', index + 1);
+    } else if (section === 'addProfileModal') {
+      if (index === 1) {
+        setFocus('addProfileModal', 2);
+      } else if (index >= 3 && index < 8) {
+        setFocus('addProfileModal', index + 1);
+      } else if (index >= 9 && index < totalCount - 1) {
+        setFocus('addProfileModal', index + 1);
+      }
     }
   }
 
   function handleBack() {
     const modal = activeModal();
+    if (modal === 'profileQuickMenu') {
+      setActiveModal('none');
+      setFocus('topBar', 6);
+      return;
+    }
+    if (modal === 'addProfileModal') {
+      // Find the Cancel button based on what it says (inner text) instead of hardcoding index
+      const buttons = document.querySelectorAll('[data-section="addProfileModal"]');
+      let cancelBtn: HTMLElement | null = null;
+      buttons.forEach(btn => {
+        if (btn.textContent === 'Cancel') cancelBtn = btn as HTMLElement;
+      });
+      
+      if (cancelBtn) {
+        // If an input is focused, the first back press should only dismiss keyboard (handled naturally by not stopping propagation)
+        // Wait, if it's an input, do we want to close the modal? No!
+        if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+          (document.activeElement as HTMLElement).blur();
+          return;
+        }
+        cancelBtn.click();
+      } else {
+        setActiveModal('none');
+        setFocus('topBar', 0);
+      }
+      return;
+    }
+    if (modal === 'profileSelector') {
+      setActiveModal('none');
+      setFocus('topBar', getTopBarIndexFromTab(activeTab()));
+      return;
+    }
     if (modal === 'exitConfirm') {
       cancelExit();
       return;
@@ -798,7 +892,7 @@ function createFocusEngine() {
     setActiveTab(tab);
   }
 
-  function setModal(modal: 'none' | 'nowPlaying' | 'albumDetail' | 'settingsServer' | 'settingsAccount' | 'exitConfirm') {
+  function setModal(modal: 'none' | 'nowPlaying' | 'albumDetail' | 'settingsServer' | 'settingsAccount' | 'exitConfirm' | 'profileSelector' | 'profileQuickMenu' | 'addProfileModal' | 'setup') {
     cachedHomeRowRanges = null;
     setActiveModal(modal);
   }
@@ -842,6 +936,7 @@ function createFocusEngine() {
     selectedAlbumId,
     setSelectedAlbumId,
     setFocus,
+    setSectionLength,
     setGridColumns,
     handleKeyDown,
     handleKeyUp,

@@ -2,6 +2,7 @@ import { Component, For, createResource, createEffect } from 'solid-js';
 import { api, Playlist } from '../services/api';
 import { focusEngine } from '../services/focus';
 import { PlaylistsIcon } from './common/Icons';
+import { sessionVersionSignal } from '../services/profiles';
 
 interface PlaylistsViewProps {
   onSelectPlaylist: (playlist: Playlist) => void;
@@ -11,6 +12,7 @@ export const PlaylistsView: Component<PlaylistsViewProps> = (props) => {
   const resourceSource = () => ({
     configured: api.isConfigured(),
     configKey: api.getConfig()?.serverUrl || '',
+    version: sessionVersionSignal(),
   });
 
   const [playlists] = createResource(resourceSource, async ({ configured }) => {
@@ -25,6 +27,9 @@ export const PlaylistsView: Component<PlaylistsViewProps> = (props) => {
 
   createEffect(() => {
     focusEngine.setGridColumns(4);
+    if (playlists()) {
+      focusEngine.setSectionLength('grid', playlists()!.length);
+    }
   });
 
   return (

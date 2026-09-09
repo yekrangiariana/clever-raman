@@ -1,6 +1,7 @@
 import { Component, For } from 'solid-js';
 import { focusEngine } from '../services/focus';
 import { SearchIcon, SettingsIcon } from './common/Icons';
+import { activeProfileSignal, GRADIENT_PRESETS } from '../services/profiles';
 
 export const TopBar: Component = () => {
   const tabs = [
@@ -11,6 +12,9 @@ export const TopBar: Component = () => {
     { id: 'search', label: 'Search', isSearch: true },
     { id: 'settings', label: 'Settings', isSettings: true },
   ];
+
+  const activeProfile = () => activeProfileSignal();
+  const activePreset = () => GRADIENT_PRESETS[activeProfile()?.gradientPreset || 'crimson'] || GRADIENT_PRESETS.crimson;
 
   const handleSelectTab = (tabId: string, index: number) => {
     if (tabId === 'nowPlaying') {
@@ -29,6 +33,11 @@ export const TopBar: Component = () => {
       focusEngine.setActiveTab(tabId as any);
       focusEngine.setFocus('topBar', index);
     }
+  };
+
+  const handleOpenProfileMenu = () => {
+    focusEngine.setActiveModal('profileQuickMenu');
+    setTimeout(() => focusEngine.setFocus('profileQuickMenu', 0), 50);
   };
 
   return (
@@ -63,6 +72,20 @@ export const TopBar: Component = () => {
               );
             }}
           </For>
+
+          {/* Profile Avatar Badge Button */}
+          <div class="w-px h-7 bg-neutral-800 my-auto mx-1" />
+          
+          <button
+            onClick={handleOpenProfileMenu}
+            class={`w-10 h-10 rounded-full ${activePreset().bg} flex items-center justify-center text-white font-black text-lg shadow-md border border-white/30 hover:scale-110 cursor-pointer shrink-0`}
+            title={`Switch Profile (${activeProfile()?.name || 'Account'})`}
+            data-focusable="true"
+            data-section="topBar"
+            data-index="6"
+          >
+            {activeProfile()?.name?.charAt(0).toUpperCase() || 'U'}
+          </button>
         </nav>
       </div>
     </header>
