@@ -17,6 +17,8 @@ function createFocusEngine() {
   const [activeTab, setActiveTab] = createSignal<'home' | 'albums' | 'playlists' | 'nowPlaying' | 'search' | 'settings'>('home');
   const [activeModal, setActiveModal] = createSignal<'none' | 'nowPlaying' | 'albumDetail' | 'settingsServer' | 'settingsAccount' | 'exitConfirm' | 'profileSelector' | 'profileQuickMenu' | 'addProfileModal' | 'setup'>('none');
   const [selectedAlbumId, setSelectedAlbumId] = createSignal<string | null>(null);
+  const [selectedPlaylistId, setSelectedPlaylistId] = createSignal<string | null>(null);
+  const [selectedMixGenre, setSelectedMixGenre] = createSignal<string | null>(null);
 
   let gridColumns = 4;
   let lastFocusedElement: HTMLElement | null = null;
@@ -66,8 +68,8 @@ function createFocusEngine() {
         const trackStartIdx = trackStartAttr ? parseInt(trackStartAttr, 10) : 4;
 
         if (section === 'topBar') {
-          const main = document.querySelector('main');
-          if (main) main.scrollTo({ top: 0, behavior: 'auto' });
+          const scrollContainer = document.querySelector('.overflow-y-auto') || document.querySelector('main');
+          if (scrollContainer) scrollContainer.scrollTo({ top: 0, behavior: 'auto' });
         } else if (section === 'search_kbd' || section === 'search_mode') {
           // Virtual keyboard and mode switchers are fixed on the left stage
           // Screen must not move down at all while navigating the keyboard
@@ -134,10 +136,27 @@ function createFocusEngine() {
             scrollParent.scrollLeft = 0;
             const listRow = (target.closest('[data-variant="list"]') as HTMLElement) || target;
             const isListVariant = listRow.getAttribute('data-variant') === 'list' || section === 'albumDetail' || section.startsWith('albumDetail_');
-            const isFirstItem = (section === 'albumDetail' || section.startsWith('albumDetail_')) ? (index === trackStartIdx) : (index === 0);
+            
+            let isFirstRow = false;
+            if (section === 'albumDetail' || section.startsWith('albumDetail_')) {
+              isFirstRow = (index === trackStartIdx);
+            } else if (section === 'grid') {
+              if (activeTab() === 'home') {
+                const rows = getHomeRowRanges();
+                if (rows.length > 0 && index < rows[0].start + rows[0].count) {
+                  isFirstRow = true;
+                }
+              } else {
+                isFirstRow = index < (gridColumns || 4);
+              }
+            } else if (section === 'search' || section === 'search_results') {
+              isFirstRow = index < 3;
+            } else {
+              isFirstRow = (index === 0);
+            }
 
-            if (isFirstItem) {
-              // First item in section -> scroll container 100% to top
+            if (isFirstRow) {
+              // First row -> scroll container 100% to top
               scrollParent.scrollTo({ top: 0, behavior: 'auto' });
             } else if (isLastRow) {
               // Last item or bottom row -> scroll container 100% to bottom
@@ -172,8 +191,7 @@ function createFocusEngine() {
             }
           }
 
-          // Always scroll outer card wrapper into view without horizontal shifting (bypass for search, albumDetail, and list items)
-          if (!section.startsWith('search') && !section.startsWith('albumDetail') && target.getAttribute('data-variant') !== 'list') {
+          if (activeTab() === 'home') {
             const scrollTarget = (target.closest('[data-card-wrapper]') as HTMLElement) || target;
             scrollTarget.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
           }
@@ -237,7 +255,7 @@ function createFocusEngine() {
     switch (keyCode) {
       case 38: // UP
         e.preventDefault();
-        handleUp(section, index, totalCount);
+        handleUp(section, index);
         break;
 
       case 40: // DOWN
@@ -318,7 +336,7 @@ function createFocusEngine() {
     return cachedHomeRowRanges;
   }
 
-  function handleUp(section: FocusSection, index: number, totalCount: number) {
+  function handleUp(section: FocusSection, index: number) {
     if (section === 'grid') {
       if (activeTab() === 'home') {
         const rows = getHomeRowRanges();
@@ -353,19 +371,17 @@ function createFocusEngine() {
       const trackStartAttr = document.querySelector('[data-track-start]')?.getAttribute('data-track-start');
       const trackStart = trackStartAttr ? parseInt(trackStartAttr, 10) : 4;
       if (index >= trackStart) {
-        if (index === trackStart) setFocus('albumDetail', 1);
+        if (index === trackStart) setFocus('albumDetail', 0);
         else setFocus('albumDetail', index - 1);
       } else {
         setFocus('topBar', getTopBarIndexFromTab(activeTab()));
       }
     } else if (section === 'nowPlaying') {
-      if (index === 8) {
-        setFocus('nowPlaying', 2);
-      } else if (index > 0) {
-        setFocus('nowPlaying', 0);
+      if (index === 7) {
+        setFocus('nowPlaying', 1);
       }
     } else if (section === 'nowPlayingQueue_header') {
-      setFocus('nowPlaying', 7);
+      setFocus('nowPlaying', 6);
     } else if (section === 'nowPlayingQueue') {
       if (index > 0) {
         setFocus('nowPlayingQueue', index - 1);
@@ -374,7 +390,7 @@ function createFocusEngine() {
         if (headerElem) {
           setFocus('nowPlayingQueue_header' as FocusSection, 0);
         } else {
-          setFocus('nowPlaying', 7);
+          setFocus('nowPlaying', 6);
         }
       }
     } else if (section === 'nowPlayingQueue_remove') {
@@ -462,7 +478,7 @@ function createFocusEngine() {
       if (modal === 'albumDetail') {
         setFocus('albumDetail', 1);
       } else if (modal === 'nowPlaying') {
-        setFocus('nowPlaying', 2);
+        setFocus('nowPlaying', 1);
       } else if (activeTab() === 'search') {
         setFocus('search_mode', 0);
       } else if (activeTab() === 'settings') {
@@ -498,18 +514,14 @@ function createFocusEngine() {
     } else if (section === 'albumDetail') {
       const trackStartAttr = document.querySelector('[data-track-start]')?.getAttribute('data-track-start');
       const trackStart = trackStartAttr ? parseInt(trackStartAttr, 10) : 4;
-      if (index === 0) {
-        setFocus('albumDetail', 1);
-      } else if (index < trackStart) {
+      if (index < trackStart) {
         setFocus('albumDetail', trackStart);
       } else if (index < totalCount - 1) {
         setFocus('albumDetail', index + 1);
       }
     } else if (section === 'nowPlaying') {
-      if (index === 0) {
-        setFocus('nowPlaying', 2);
-      } else if (index < 8) {
-        setFocus('nowPlaying', 8);
+      if (index < 7) {
+        setFocus('nowPlaying', 7);
       }
     } else if (section === 'nowPlayingQueue_header') {
       const queueTrack = document.querySelector('[data-section="nowPlayingQueue"][data-index="0"]');
@@ -602,15 +614,15 @@ function createFocusEngine() {
         if (index > 0) setFocus('albumDetail', index - 1);
       }
     } else if (section === 'nowPlaying') {
-      if (index === 8) {
+      if (index === 7) {
         audioPlayer.seekStep(-5);
       } else if (index > 0) {
         setFocus('nowPlaying', index - 1);
       }
     } else if (section === 'nowPlayingQueue_header') {
-      setFocus('nowPlaying', 7);
+      setFocus('nowPlaying', 6);
     } else if (section === 'nowPlayingQueue') {
-      setFocus('nowPlaying', 7);
+      setFocus('nowPlaying', 6);
     } else if (section === 'nowPlayingQueue_remove') {
       setFocus('nowPlayingQueue', index);
     } else if (section.endsWith('_heart')) {
@@ -695,13 +707,13 @@ function createFocusEngine() {
         setFocus('albumDetail', index + 1);
       }
     } else if (section === 'nowPlaying') {
-      if (index === 8) {
+      if (index === 7) {
         audioPlayer.seekStep(5);
-      } else if (index === 7) {
+      } else if (index === 6) {
         const playingTrack = document.querySelector('[data-section="nowPlayingQueue"][data-playing="true"]');
         const defaultIndex = playingTrack ? parseInt(playingTrack.getAttribute('data-index') || '0', 10) : 0;
         setFocus('nowPlayingQueue', defaultIndex);
-      } else if (index < 7) {
+      } else if (index < 6) {
         setFocus('nowPlaying', index + 1);
       }
     } else if (section === 'nowPlayingQueue') {
@@ -709,10 +721,10 @@ function createFocusEngine() {
       if (removeBtn) {
         setFocus('nowPlayingQueue_remove' as FocusSection, index);
       } else {
-        setFocus('nowPlaying', 7);
+        setFocus('nowPlaying', 6);
       }
     } else if (section === 'nowPlayingQueue_remove') {
-      setFocus('nowPlaying', 7);
+      setFocus('nowPlaying', 6);
     } else if (section.endsWith('_queue')) {
       const heartSection = section.replace('_queue', '_heart') as FocusSection;
       const heartBtn = document.querySelector(`[data-section="${heartSection}"][data-index="${index}"]`);
@@ -774,7 +786,7 @@ function createFocusEngine() {
     } else if (section === 'addProfileModal') {
       if (index === 1) {
         setFocus('addProfileModal', 2);
-      } else if (index >= 3 && index < 8) {
+      } else if (index >= 3 && index < 6) {
         setFocus('addProfileModal', index + 1);
       } else if (index >= 9 && index < totalCount - 1) {
         setFocus('addProfileModal', index + 1);
@@ -791,11 +803,8 @@ function createFocusEngine() {
     }
     if (modal === 'addProfileModal') {
       // Find the Cancel button based on what it says (inner text) instead of hardcoding index
-      const buttons = document.querySelectorAll('[data-section="addProfileModal"]');
-      let cancelBtn: HTMLElement | null = null;
-      buttons.forEach(btn => {
-        if (btn.textContent === 'Cancel') cancelBtn = btn as HTMLElement;
-      });
+      const buttons = Array.from(document.querySelectorAll('[data-section="addProfileModal"]'));
+      const cancelBtn = buttons.find(btn => btn.textContent === 'Cancel') as HTMLElement | undefined;
       
       if (cancelBtn) {
         // If an input is focused, the first back press should only dismiss keyboard (handled naturally by not stopping propagation)
@@ -826,13 +835,13 @@ function createFocusEngine() {
       return;
     }
     if (currentLocation().section.startsWith('nowPlayingQueue')) {
-      setFocus('nowPlaying', 7);
+      setFocus('nowPlaying', 6);
       return;
     }
     if (modal === 'nowPlaying') {
-      if (selectedAlbumId()) {
+      if (selectedAlbumId() || selectedPlaylistId() || selectedMixGenre()) {
         setActiveModal('albumDetail');
-        setFocus('albumDetail', 1);
+        setFocus('albumDetail', 0);
       } else {
         setActiveModal('none');
         setFocus('grid', 0);
@@ -935,6 +944,10 @@ function createFocusEngine() {
     setActiveModal: setModal,
     selectedAlbumId,
     setSelectedAlbumId,
+    selectedPlaylistId,
+    setSelectedPlaylistId,
+    selectedMixGenre,
+    setSelectedMixGenre,
     setFocus,
     setSectionLength,
     setGridColumns,

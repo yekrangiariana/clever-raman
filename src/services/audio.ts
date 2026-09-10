@@ -502,7 +502,7 @@ function createAudioPlayer() {
    */
   function clearUserQueue() {
     setUserQueue([]);
-    setExplicitSingleQueueIds(new Set());
+    setExplicitSingleQueueIds(new Set<string>());
     showToast('Queue Cleared');
   }
 

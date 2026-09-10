@@ -1,4 +1,4 @@
-import { Component, For, Show, createResource, createEffect, createMemo } from 'solid-js';
+import { Component, For, createResource, createEffect, createMemo } from 'solid-js';
 import { api, Album, Genre, Playlist, Song } from '../services/api';
 import { audioPlayer } from '../services/audio';
 import { focusEngine } from '../services/focus';

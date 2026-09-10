@@ -1,8 +1,7 @@
-import { Component, createSignal, onMount, onCleanup, Show, For, createEffect } from 'solid-js';
+import { Component, createSignal, onMount, onCleanup, Show } from 'solid-js';
 import { api, Album, Playlist } from './services/api';
-import { audioPlayer } from './services/audio';
 import { focusEngine } from './services/focus';
-import { getProfiles, sessionVersionSignal, getShowBootSelector, editingProfileSignal, setEditingProfileSignal, addProfileReturnState, setAddProfileReturnState } from './services/profiles';
+import { getProfiles, getShowBootSelector, editingProfileSignal, setEditingProfileSignal, addProfileReturnState, setAddProfileReturnState } from './services/profiles';
 import { AmbientGlow } from './components/AmbientGlow';
 import { TopBar } from './components/TopBar';
 import { HomeView, prefetchHomeData } from './components/HomeView';
@@ -58,7 +57,7 @@ export const App: Component = () => {
         setTimeout(() => focusEngine.setFocus('profileSelector', 0), 50);
         setTimeout(dismissSplash, 500);
       } else {
-        focusEngine.setFocus('topBar', 0);
+        focusEngine.setFocus('grid', 0);
 
         const minDisplayPromise = new Promise<void>((resolve) => setTimeout(resolve, 600));
         const safetyTimeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2500));
@@ -94,8 +93,10 @@ export const App: Component = () => {
     setSelectedMixGenre(null);
     setSelectedCoverVariant(null);
     focusEngine.setSelectedAlbumId(album.id);
+    focusEngine.setSelectedPlaylistId(null);
+    focusEngine.setSelectedMixGenre(null);
     focusEngine.setActiveModal('albumDetail');
-    focusEngine.setFocus('albumDetail', 1);
+    focusEngine.setFocus('albumDetail', 0);
   };
 
   const handleSelectPlaylist = (pl: Playlist, coverVariant?: 'station' | 'meshMix') => {
@@ -103,8 +104,11 @@ export const App: Component = () => {
     setSelectedAlbum(null);
     setSelectedMixGenre(null);
     setSelectedCoverVariant(coverVariant || null);
+    focusEngine.setSelectedPlaylistId(pl.id);
+    focusEngine.setSelectedAlbumId(null);
+    focusEngine.setSelectedMixGenre(null);
     focusEngine.setActiveModal('albumDetail');
-    focusEngine.setFocus('albumDetail', 1);
+    focusEngine.setFocus('albumDetail', 0);
   };
 
   const handleSelectMix = (genre: string, coverVariant?: 'meshMix' | 'genreMix') => {
@@ -112,8 +116,11 @@ export const App: Component = () => {
     setSelectedAlbum(null);
     setSelectedPlaylist(null);
     setSelectedCoverVariant(coverVariant || null);
+    focusEngine.setSelectedMixGenre(genre);
+    focusEngine.setSelectedAlbumId(null);
+    focusEngine.setSelectedPlaylistId(null);
     focusEngine.setActiveModal('albumDetail');
-    focusEngine.setFocus('albumDetail', 1);
+    focusEngine.setFocus('albumDetail', 0);
   };
 
   const handleSelectGenre = (genre: string) => {
@@ -143,34 +150,6 @@ export const App: Component = () => {
     setSelectedMixGenre(null);
     setSelectedCoverVariant(null);
     focusEngine.setFocus('grid', 0);
-  };
-
-  const nowPlayingBackLabel = () => {
-    if (selectedPlaylist()) return 'Back to Playlist';
-    if (selectedMixGenre()) return 'Back to Mix';
-    if (selectedAlbum() || audioPlayer.currentTrack()?.albumId) return 'Back to Album';
-    return 'Back to Library';
-  };
-
-  const handleBackFromNowPlaying = () => {
-    if (selectedAlbum() || selectedPlaylist() || selectedMixGenre()) {
-      focusEngine.setActiveModal('albumDetail');
-      focusEngine.setFocus('albumDetail', 1);
-    } else if (audioPlayer.currentTrack()?.albumId) {
-      const t = audioPlayer.currentTrack()!;
-      setSelectedAlbum({
-        id: t.albumId!,
-        title: t.album || 'Album',
-        artist: t.artist || '',
-        coverArt: t.coverArt,
-      } as Album);
-      focusEngine.setSelectedAlbumId(t.albumId!);
-      focusEngine.setActiveModal('albumDetail');
-      focusEngine.setFocus('albumDetail', 1);
-    } else {
-      focusEngine.setActiveModal('none');
-      focusEngine.setFocus('grid', 0);
-    }
   };
 
   return (
@@ -230,10 +209,7 @@ export const App: Component = () => {
       </div>
 
       {focusEngine.activeModal() === 'nowPlaying' && (
-        <NowPlayingView
-          onBack={handleBackFromNowPlaying}
-          backLabel={nowPlayingBackLabel()}
-        />
+        <NowPlayingView />
       )}
 
       <Show when={focusEngine.activeModal() === 'profileSelector'}>

@@ -3,7 +3,7 @@ import { api, Song, Album, Playlist } from '../services/api';
 import { audioPlayer } from '../services/audio';
 import { focusEngine } from '../services/focus';
 import { TrackRow } from './common/TrackRow';
-import { PlayIcon, ShuffleIcon, QueueAddIcon, HeartIcon, ArrowLeftIcon, MusicNoteIcon, CheckIcon } from './common/Icons';
+import { PlayIcon, ShuffleIcon, QueueAddIcon, HeartIcon, MusicNoteIcon, CheckIcon } from './common/Icons';
 
 interface CollectionData {
   title: string;
@@ -151,12 +151,12 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
   createEffect(() => {
     const songs = data().songs;
     
-    // Set focus engine length dynamically
-    // Header buttons (Play, Shuffle) = 2. Then tracks.
+    // Set focus engine length dynamically based on header controls + track count
+    const headerCount = indices().trackStartIdx;
     if (songs) {
-      focusEngine.setSectionLength('albumDetail', 2 + songs.length);
+      focusEngine.setSectionLength('albumDetail', headerCount + songs.length);
     } else {
-      focusEngine.setSectionLength('albumDetail', 2);
+      focusEngine.setSectionLength('albumDetail', headerCount);
     }
 
     setVisibleLimit(50);
@@ -240,9 +240,9 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
     }
   };
 
-  // Header buttons: 0=back, 1=play, 2=shuffle, 3=queue, 4=star (albums only). Tracks start after.
+  // Header buttons: 0=play, 1=shuffle, 2=queue, 3=star (albums only). Tracks start after.
   const indices = () => {
-    let idx = 1;
+    let idx = 0;
     const playIdx = idx++;
     const shuffleIdx = idx++;
     const queueIdx = idx++;
@@ -253,20 +253,6 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
 
   return (
     <div class="flex-1 w-full pt-4 px-16 pb-6 flex flex-col justify-start z-10 h-[calc(100vh-100px)] overflow-hidden">
-      {/* Back Button Row */}
-      <div class="flex items-center shrink-0 mb-4">
-        <button
-          onClick={props.onClose}
-          class="px-6 py-2.5 rounded-full bg-neutral-800/90 text-white font-bold text-2xl flex items-center gap-3 hover:bg-neutral-700 transition-all border border-neutral-700/80 shadow-md"
-          data-focusable="true"
-          data-section="albumDetail"
-          data-index="0"
-        >
-          <ArrowLeftIcon class="w-6 h-6" />
-          Back
-        </button>
-      </div>
-
       <div class="flex-1 flex gap-16 items-start w-full min-h-0 overflow-visible">
         {/* Album Artwork - Stationary on left */}
         <div class="w-[520px] h-[520px] rounded-3xl overflow-hidden bg-neutral-900 shadow-2xl shrink-0 border border-neutral-800/40">

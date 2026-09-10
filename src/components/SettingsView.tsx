@@ -1,8 +1,7 @@
 import { Component, createSignal, For, Show } from 'solid-js';
 import { api } from '../services/api';
 import { focusEngine } from '../services/focus';
-import { profilesSignal, activeProfileSignal, showBootSelectorSignal, setShowBootSelector, UserProfile, GRADIENT_PRESETS, deleteProfile, setEditingProfileSignal, setAddProfileReturnState } from '../services/profiles';
-import { AddProfileModal } from './AddProfileModal';
+import { profilesSignal, activeProfileSignal, showBootSelectorSignal, setShowBootSelector, UserProfile, GRADIENT_PRESETS, setEditingProfileSignal, setAddProfileReturnState } from '../services/profiles';
 import { clearHomeCache } from './HomeView';
 import { clearSearchCache } from './SearchView';
 import { clearAlbumCache } from './MainGrid';
@@ -11,7 +10,6 @@ import { SettingsIcon, ChevronRightIcon } from './common/Icons';
 export const SettingsView: Component = () => {
   const [statusMsg, setStatusMsg] = createSignal<string>('');
   const [isTesting, setIsTesting] = createSignal<boolean>(false);
-  const [editingProfile, setEditingProfile] = createSignal<UserProfile | null>(null);
 
   const config = () => api.getConfig();
   const profiles = () => profilesSignal();

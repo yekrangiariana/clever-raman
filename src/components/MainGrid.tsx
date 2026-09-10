@@ -117,13 +117,12 @@ export const MainGrid: Component<MainGridProps> = (props) => {
 
   createEffect(() => {
     // Re-run whenever these props change
-    const _genre = props.selectedGenre;
-    const _artist = props.selectedArtist;
-    const _filter = currentFilter();
-    const _version = sessionVersionSignal();
-    const _configured = api.isConfigured();
+    props.selectedGenre;
+    props.selectedArtist;
+    currentFilter();
+    sessionVersionSignal();
     
-    if (_configured) {
+    if (api.isConfigured()) {
       fetchData(true);
     }
   });

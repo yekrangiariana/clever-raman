@@ -166,7 +166,6 @@ class SubsonicApi {
     this.config = null;
     this.clearDetailsCache();
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
   }
 
   public isConfigured(): boolean {
@@ -453,7 +452,7 @@ class SubsonicApi {
    */
   public async star(id: string, isAlbum = false): Promise<boolean> {
     try {
-      const param = isAlbum ? { albumId: id } : { id };
+      const param: Record<string, string> = isAlbum ? { albumId: id } : { id };
       await this.request('star.view', param);
       return true;
     } catch (e) {
@@ -467,7 +466,7 @@ class SubsonicApi {
    */
   public async unstar(id: string, isAlbum = false): Promise<boolean> {
     try {
-      const param = isAlbum ? { albumId: id } : { id };
+      const param: Record<string, string> = isAlbum ? { albumId: id } : { id };
       await this.request('unstar.view', param);
       return true;
     } catch (e) {

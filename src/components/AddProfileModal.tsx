@@ -1,10 +1,7 @@
 import { Component, createSignal, For, onMount } from 'solid-js';
-import { UserProfile, GRADIENT_PRESETS, saveProfile, setActiveProfileId, getActiveProfileId, deleteProfile } from '../services/profiles';
+import { UserProfile, GRADIENT_PRESETS, saveProfile, getActiveProfileId, deleteProfile } from '../services/profiles';
 import { api } from '../services/api';
 import { focusEngine } from '../services/focus';
-import { clearHomeCache } from './HomeView';
-import { clearSearchCache } from './SearchView';
-import { clearAlbumCache } from './MainGrid';
 
 interface AddProfileModalProps {
   initialProfile?: UserProfile | null;

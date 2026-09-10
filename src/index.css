@@ -29,13 +29,13 @@
 }
 
 /* Card Focus (Grid items, Cover arts, Mix cards) - Fast, Crisp Scale Animation */
-[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]) {
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):not([data-variant="topPick"]) {
   outline: none;
   will-change: transform;
   transition: transform 0.12s ease-out !important;
 }
 
-[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]).focused {
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):not([data-variant="topPick"]).focused {
   outline: none !important;
   transform: scale3d(1.05, 1.05, 1) !important;
   z-index: 30;
@@ -62,8 +62,8 @@
 }
 
 /* Card Tactile Press Down State (Keydown Enter / Active Click) */
-[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]).pressed,
-[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):active {
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):not([data-variant="topPick"]).pressed,
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):not([data-variant="topPick"]):active {
   transform: scale3d(0.93, 0.93, 1) !important;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 255, 255, 0.7) !important;
   transition: transform 0.06s ease-out !important;

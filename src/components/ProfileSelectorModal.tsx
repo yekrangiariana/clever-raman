@@ -2,9 +2,6 @@ import { Component, createSignal, For, onMount, Show } from 'solid-js';
 import { getProfiles, getActiveProfileId, UserProfile, GRADIENT_PRESETS } from '../services/profiles';
 import { api } from '../services/api';
 import { focusEngine } from '../services/focus';
-import { clearHomeCache, prefetchHomeData } from './HomeView';
-import { clearSearchCache } from './SearchView';
-import { clearAlbumCache } from './MainGrid';
 
 interface ProfileSelectorModalProps {
   onClose?: () => void;

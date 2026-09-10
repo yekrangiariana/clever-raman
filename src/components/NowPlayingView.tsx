@@ -13,15 +13,9 @@ import {
   HeartIcon,
   QueueListIcon,
   CloseIcon,
-  ArrowLeftIcon,
   MusicNoteIcon,
   CheckIcon,
 } from './common/Icons';
-
-interface NowPlayingViewProps {
-  onBack?: () => void;
-  backLabel?: string;
-}
 
 function formatDuration(sec: number): string {
   if (!sec || isNaN(sec)) return '0:00';
@@ -30,7 +24,7 @@ function formatDuration(sec: number): string {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
+export const NowPlayingView: Component = () => {
   const track = () => audioPlayer.currentTrack();
   const [isStarred, setIsStarred] = createSignal<boolean>(false);
   const [showQueue, setShowQueue] = createSignal<boolean>(false);
@@ -99,7 +93,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
     }
   }
 
-  function handlePointerCancel(e: PointerEvent) {
+  function handlePointerCancel() {
     if (isDragging()) {
       setIsDragging(false);
       setDragTime(null);
@@ -148,15 +142,6 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
     }
   }
 
-  function handleBack() {
-    if (props.onBack) {
-      props.onBack();
-    } else {
-      focusEngine.setActiveModal('albumDetail');
-      focusEngine.setFocus('albumDetail', 1);
-    }
-  }
-
   function handleToggleQueue() {
     const next = !showQueue();
     setShowQueue(next);
@@ -196,18 +181,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
   return (
     <div class="fixed inset-0 z-50 bg-black/20 flex flex-col justify-between p-12 overflow-hidden">
       {/* Top Header: Back Button Top Left */}
-      <div class="flex items-center justify-between z-20 shrink-0">
-        <button
-          onClick={handleBack}
-          class="px-6 py-3 rounded-full bg-neutral-900 border border-neutral-800 text-white font-extrabold text-xl flex items-center gap-3 hover:bg-neutral-800 shadow-lg"
-          data-focusable="true"
-          data-section="nowPlaying"
-          data-index="0"
-        >
-          <ArrowLeftIcon class="w-6 h-6" />
-          {props.backLabel || 'Back to Album'}
-        </button>
-
+      <div class="flex items-center justify-end z-20 shrink-0">
         <span class="text-2xl font-extrabold text-neutral-400 tracking-wide truncate max-w-xl">
           {track()?.album ? `Album: ${track()!.album}` : 'Now Playing'}
         </span>
@@ -250,7 +224,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               class="w-16 h-16 rounded-full bg-neutral-900/90 flex items-center justify-center text-white hover:bg-neutral-800 border border-neutral-800 shadow-md"
               data-focusable="true"
               data-section="nowPlaying"
-              data-index="1"
+              data-index="0"
             >
               <SkipPrevIcon class="w-8 h-8" />
             </button>
@@ -261,7 +235,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               class="w-20 h-20 rounded-full bg-white flex items-center justify-center text-black shadow-2xl hover:scale-105"
               data-focusable="true"
               data-section="nowPlaying"
-              data-index="2"
+              data-index="1"
             >
               {audioPlayer.isPlaying() ? (
                 <PauseIcon class="w-10 h-10" />
@@ -276,7 +250,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               class="w-16 h-16 rounded-full bg-neutral-900/90 flex items-center justify-center text-white hover:bg-neutral-800 border border-neutral-800 shadow-md"
               data-focusable="true"
               data-section="nowPlaying"
-              data-index="3"
+              data-index="2"
             >
               <SkipNextIcon class="w-8 h-8" />
             </button>
@@ -289,7 +263,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               }`}
               data-focusable="true"
               data-section="nowPlaying"
-              data-index="4"
+              data-index="3"
               title="Shuffle"
             >
               <ShuffleIcon class="w-7 h-7" />
@@ -303,7 +277,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               }`}
               data-focusable="true"
               data-section="nowPlaying"
-              data-index="5"
+              data-index="4"
               title={`Repeat: ${audioPlayer.repeatMode()}`}
             >
               {audioPlayer.repeatMode() === 'one' ? (
@@ -321,7 +295,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               }`}
               data-focusable="true"
               data-section="nowPlaying"
-              data-index="6"
+              data-index="5"
             >
               <HeartIcon filled={isStarred()} class="w-7 h-7" />
             </button>
@@ -334,7 +308,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
               }`}
               data-focusable="true"
               data-section="nowPlaying"
-              data-index="7"
+              data-index="6"
               title="Up Next Queue"
             >
               <QueueListIcon class="w-7 h-7" />
@@ -624,7 +598,7 @@ export const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
           data-focusable="true"
           data-variant="seekBar"
           data-section="nowPlaying"
-          data-index="8"
+          data-index="7"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
