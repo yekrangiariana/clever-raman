@@ -49,160 +49,151 @@ function createFocusEngine() {
   }
 
   function syncDOMFocus(section: FocusSection, index: number, isPointer = false) {
+    const selector = `[data-focusable="true"][data-section="${section}"][data-index="${index}"]`;
+    const target = document.querySelector(selector) as HTMLElement | null;
+
+    let pendingScrollTop: number | null = null;
+    let pendingScrollTopReset: boolean | 'bottom' | false = false;
+    let scrollParent: HTMLElement | null = null;
+    let pendingScrollIntoViewTarget: HTMLElement | null = null;
+    let pendingResetTracklist: HTMLElement | null = null;
+
+    // 1. DOM READ & MEASUREMENT PHASE (Read layout before dirtying layout tree)
+    if (target && !isPointer) {
+      const trackStartAttr = document.querySelector('[data-track-start]')?.getAttribute('data-track-start');
+      const trackStartIdx = trackStartAttr ? parseInt(trackStartAttr, 10) : 4;
+
+      if (section === 'topBar') {
+        scrollParent = document.querySelector('.overflow-y-auto') || document.querySelector('main');
+        if (scrollParent) pendingScrollTopReset = true;
+      } else if (section === 'search_kbd' || section === 'search_mode') {
+        // Fixed stage
+      } else if (section === 'search_tabs') {
+        scrollParent = target.closest('.overflow-y-auto') as HTMLElement | null;
+        if (scrollParent) pendingScrollTopReset = true;
+      } else if (section === 'albumDetail' && index < trackStartIdx) {
+        pendingResetTracklist = document.querySelector('[data-track-start]') as HTMLElement | null;
+      } else {
+        scrollParent = target.parentElement;
+        while (scrollParent && scrollParent !== document.body) {
+          const style = window.getComputedStyle(scrollParent);
+          const isScrollableY =
+            (style.overflowY === 'auto' || style.overflowY === 'scroll' || scrollParent.tagName === 'MAIN') &&
+            scrollParent.scrollHeight > scrollParent.clientHeight + 5;
+          if (isScrollableY) break;
+          scrollParent = scrollParent.parentElement;
+        }
+
+        let totalCount = sectionLengths.get(section);
+        if (totalCount === undefined) {
+          totalCount = document.querySelectorAll(`[data-focusable="true"][data-section="${section}"]`).length;
+        }
+
+        let isLastRow = false;
+        if (section === 'grid') {
+          if (activeTab() === 'home') {
+            const rows = getHomeRowRanges();
+            const curRowIdx = rows.findIndex((r) => index >= r.start && index < r.start + r.count);
+            if (curRowIdx >= 0 && curRowIdx === rows.length - 1) isLastRow = true;
+          } else {
+            const cols = gridColumns || 4;
+            if (index >= Math.floor((totalCount - 1) / cols) * cols) isLastRow = true;
+          }
+        } else if (section === 'search' || section === 'search_results') {
+          if (index >= Math.floor((totalCount - 1) / 3) * 3) isLastRow = true;
+        } else if (index >= totalCount - 1) {
+          isLastRow = true;
+        }
+
+        if (scrollParent) {
+          const listRow = (target.closest('[data-variant="list"]') as HTMLElement) || target;
+          const isListVariant = listRow.getAttribute('data-variant') === 'list' || section === 'albumDetail' || section.startsWith('albumDetail_');
+          
+          let isFirstRow = false;
+          if (section === 'albumDetail' || section.startsWith('albumDetail_')) {
+            isFirstRow = (index === trackStartIdx);
+          } else if (section === 'grid') {
+            if (activeTab() === 'home') {
+              const rows = getHomeRowRanges();
+              if (rows.length > 0 && index < rows[0].start + rows[0].count) isFirstRow = true;
+            } else {
+              isFirstRow = index < (gridColumns || 4);
+            }
+          } else if (section === 'search' || section === 'search_results') {
+            isFirstRow = index < 3;
+          } else {
+            isFirstRow = (index === 0);
+          }
+
+          if (isFirstRow) {
+            pendingScrollTopReset = true;
+          } else if (isLastRow) {
+            pendingScrollTopReset = 'bottom';
+          } else {
+            const parentRect = scrollParent.getBoundingClientRect();
+            if (isListVariant) {
+              const targetRect = listRow.getBoundingClientRect();
+              const leadDistance = targetRect.height + 20;
+              const bottomThreshold = parentRect.bottom - leadDistance;
+              const topThreshold = parentRect.top + leadDistance;
+              if (targetRect.bottom > bottomThreshold) {
+                pendingScrollTop = scrollParent.scrollTop + (targetRect.bottom - bottomThreshold);
+              } else if (targetRect.top < topThreshold) {
+                pendingScrollTop = scrollParent.scrollTop - (topThreshold - targetRect.top);
+              }
+            } else {
+              const targetRect = target.getBoundingClientRect();
+              const topClearance = 136;
+              const topOffset = 148;
+              if (targetRect.bottom > parentRect.bottom - 24) {
+                pendingScrollTop = scrollParent.scrollTop + (targetRect.bottom - parentRect.bottom + 48);
+              } else if (targetRect.top < parentRect.top + topClearance) {
+                pendingScrollTop = scrollParent.scrollTop - (parentRect.top - targetRect.top + topOffset);
+              }
+            }
+          }
+        }
+
+        if (activeTab() === 'home') {
+          pendingScrollIntoViewTarget = (target.closest('[data-card-wrapper]') as HTMLElement) || target;
+        }
+      }
+    }
+
+    // 2. DOM SCROLL PRE-APPLY (Before class mutations so scrollIntoView reads clean tree)
+    if (pendingScrollIntoViewTarget) {
+      pendingScrollIntoViewTarget.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+    }
+    if (pendingResetTracklist) {
+      pendingResetTracklist.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
+    // 3. DOM WRITE PHASE (Mutate classes and apply scroll coordinates)
     if (lastFocusedElement && document.contains(lastFocusedElement)) {
       lastFocusedElement.classList.remove('focused');
     } else {
-      const focusedElements = document.querySelectorAll('.focused');
-      focusedElements.forEach((el) => el.classList.remove('focused'));
+      document.querySelectorAll('.focused').forEach((el) => el.classList.remove('focused'));
     }
-
-    const selector = `[data-focusable="true"][data-section="${section}"][data-index="${index}"]`;
-    const target = document.querySelector(selector) as HTMLElement | null;
 
     if (target) {
       target.classList.add('focused');
       lastFocusedElement = target;
-      if (!isPointer) {
-        // Check for tracklist start index in albumDetail view
-        const trackStartAttr = document.querySelector('[data-track-start]')?.getAttribute('data-track-start');
-        const trackStartIdx = trackStartAttr ? parseInt(trackStartAttr, 10) : 4;
 
-        if (section === 'topBar') {
-          const scrollContainer = document.querySelector('.overflow-y-auto') || document.querySelector('main');
-          if (scrollContainer) scrollContainer.scrollTo({ top: 0, behavior: 'auto' });
-        } else if (section === 'search_kbd' || section === 'search_mode') {
-          // Virtual keyboard and mode switchers are fixed on the left stage
-          // Screen must not move down at all while navigating the keyboard
-        } else if (section === 'search_tabs') {
-          // Top tabs for search (Browse Genres / Artists) -> scroll right pane to top
-          const scrollParent = target.closest('.overflow-y-auto') as HTMLElement | null;
-          if (scrollParent) {
-            scrollParent.scrollTo({ top: 0, behavior: 'auto' });
-          }
-        } else if (section === 'albumDetail' && index < trackStartIdx) {
-          // Top bit of album/playlist view (Back, Play, Shuffle, Queue, Star):
-          // Keep stationary and reset tracklist scroll to top if needed
-          const tracklist = document.querySelector('[data-track-start]') as HTMLElement | null;
-          if (tracklist) {
-            tracklist.scrollTo({ top: 0, behavior: 'auto' });
-          }
-        } else {
-          // Find closest VERTICAL scrollable container parent
-          let scrollParent: HTMLElement | null = target.parentElement;
-          while (scrollParent && scrollParent !== document.body) {
-            const style = window.getComputedStyle(scrollParent);
-            const isScrollableY =
-              (style.overflowY === 'auto' || style.overflowY === 'scroll' || scrollParent.tagName === 'MAIN') &&
-              scrollParent.scrollHeight > scrollParent.clientHeight + 5;
-            if (isScrollableY) {
-              break;
-            }
-            scrollParent = scrollParent.parentElement;
-          }
-
-          let totalCount = sectionLengths.get(section);
-          if (totalCount === undefined) {
-            const allSectionElements = document.querySelectorAll(`[data-focusable="true"][data-section="${section}"]`);
-            totalCount = allSectionElements.length;
-          }
-
-          // Universal last row detection across all grid views
-          let isLastRow = false;
-          if (section === 'grid') {
-            if (activeTab() === 'home') {
-              const rows = getHomeRowRanges();
-              const curRowIdx = rows.findIndex((r) => index >= r.start && index < r.start + r.count);
-              if (curRowIdx >= 0 && curRowIdx === rows.length - 1) {
-                isLastRow = true;
-              }
-            } else {
-              const cols = gridColumns || 4;
-              const lastRowStartIndex = Math.floor((totalCount - 1) / cols) * cols;
-              if (index >= lastRowStartIndex) {
-                isLastRow = true;
-              }
-            }
-          } else if (section === 'search' || section === 'search_results') {
-            const cols = 3;
-            const lastRowStartIndex = Math.floor((totalCount - 1) / cols) * cols;
-            if (index >= lastRowStartIndex) {
-              isLastRow = true;
-            }
-          } else if (index >= totalCount - 1) {
-            isLastRow = true;
-          }
-
-          if (scrollParent) {
-            scrollParent.scrollLeft = 0;
-            const listRow = (target.closest('[data-variant="list"]') as HTMLElement) || target;
-            const isListVariant = listRow.getAttribute('data-variant') === 'list' || section === 'albumDetail' || section.startsWith('albumDetail_');
-            
-            let isFirstRow = false;
-            if (section === 'albumDetail' || section.startsWith('albumDetail_')) {
-              isFirstRow = (index === trackStartIdx);
-            } else if (section === 'grid') {
-              if (activeTab() === 'home') {
-                const rows = getHomeRowRanges();
-                if (rows.length > 0 && index < rows[0].start + rows[0].count) {
-                  isFirstRow = true;
-                }
-              } else {
-                isFirstRow = index < (gridColumns || 4);
-              }
-            } else if (section === 'search' || section === 'search_results') {
-              isFirstRow = index < 3;
-            } else {
-              isFirstRow = (index === 0);
-            }
-
-            if (isFirstRow) {
-              // First row -> scroll container 100% to top
-              scrollParent.scrollTo({ top: 0, behavior: 'auto' });
-            } else if (isLastRow) {
-              // Last item or bottom row -> scroll container 100% to bottom
-              scrollParent.scrollTo({ top: scrollParent.scrollHeight, behavior: 'auto' });
-            } else {
-              const parentRect = scrollParent.getBoundingClientRect();
-
-              if (isListVariant) {
-                // Synchronous Look-Ahead Edge Scrolling:
-                // Keeps at least 1 track visible ahead so the next track is ALWAYS already on screen.
-                // Highlight and scroll execute together in the exact same frame.
-                const targetRect = listRow.getBoundingClientRect();
-                const leadDistance = targetRect.height + 20; // 1 full track row + gap
-                const bottomThreshold = parentRect.bottom - leadDistance;
-                const topThreshold = parentRect.top + leadDistance;
-
-                if (targetRect.bottom > bottomThreshold) {
-                  scrollParent.scrollTop += (targetRect.bottom - bottomThreshold);
-                } else if (targetRect.top < topThreshold) {
-                  scrollParent.scrollTop -= (topThreshold - targetRect.top);
-                }
-              } else {
-                const targetRect = target.getBoundingClientRect();
-                const topClearance = 136;
-                const topOffset = 148;
-                if (targetRect.bottom > parentRect.bottom - 24) {
-                  scrollParent.scrollTop += (targetRect.bottom - parentRect.bottom + 48);
-                } else if (targetRect.top < parentRect.top + topClearance) {
-                  scrollParent.scrollTop -= (parentRect.top - targetRect.top + topOffset);
-                }
-              }
-            }
-          }
-
-          if (activeTab() === 'home') {
-            const scrollTarget = (target.closest('[data-card-wrapper]') as HTMLElement) || target;
-            scrollTarget.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
-          }
+      if (scrollParent) {
+        scrollParent.scrollLeft = 0;
+        if (pendingScrollTopReset === true) {
+          scrollParent.scrollTo({ top: 0, behavior: 'auto' });
+        } else if (pendingScrollTopReset === 'bottom') {
+          scrollParent.scrollTo({ top: scrollParent.scrollHeight, behavior: 'auto' });
+        } else if (pendingScrollTop !== null) {
+          scrollParent.scrollTop = pendingScrollTop;
         }
       }
 
-      if (target.tagName !== 'INPUT') {
-        if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement !== target) {
-          (document.activeElement as HTMLElement).blur();
-        }
+      if (target.tagName === 'INPUT') {
         target.focus({ preventScroll: true });
+      } else if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+        (document.activeElement as HTMLElement).blur();
       }
     }
   }

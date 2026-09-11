@@ -1,7 +1,7 @@
 {
   "name": "navios",
   "private": true,
-  "version": "1.9.97",
+  "version": "1.9.104",
   "type": "module",
   "scripts": {
     "dev": "vite",

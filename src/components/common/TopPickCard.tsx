@@ -15,7 +15,7 @@ export interface TopPickCardProps {
 
 export const TopPickCard: Component<TopPickCardProps> = (props) => {
   return (
-    <div class="flex flex-col cursor-pointer select-none w-full scroll-mb-24" data-card-wrapper="true">
+    <div class="flex flex-col cursor-pointer select-none w-full scroll-mb-24 p-2 -m-2 [content-visibility:auto] [contain-intrinsic-size:19.5rem_27.5rem]" data-card-wrapper="true">
       {/* Overline Category Label (Scaled up for TV distance viewing) */}
       <span class="text-2xl font-extrabold text-neutral-300 tracking-tight mb-3 px-0.5 truncate">
         {props.categoryLabel || 'Top Pick'}

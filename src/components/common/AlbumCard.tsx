@@ -1,4 +1,4 @@
-import { Component, createSignal, onMount, onCleanup, Show } from 'solid-js';
+import { Component, createSignal } from 'solid-js';
 import { api, Album } from '../../services/api';
 import { MusicNoteIcon } from './Icons';
 
@@ -13,28 +13,11 @@ interface AlbumCardProps {
 
 export const AlbumCard: Component<AlbumCardProps> = (props) => {
   const variant = () => props.variant || 'standard';
-  const coverUrl = () => api.getCoverArtUrl(props.album.coverArt || props.album.id, variant() === 'hero' ? 600 : 250);
+  const coverUrl = () => api.getCoverArtUrl(props.album.coverArt || props.album.id, variant() === 'hero' ? 500 : 300);
   const [imgLoaded, setImgLoaded] = createSignal(false);
-  const [isVisible, setIsVisible] = createSignal(false);
-  let cardRef: HTMLDivElement | undefined;
-
-  onMount(() => {
-    if (!cardRef) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '800px' } // Pre-load before it enters screen, sufficient buffer for fast scrolling
-    );
-    observer.observe(cardRef);
-    onCleanup(() => observer.disconnect());
-  });
 
   return (
-    <div ref={cardRef} class="flex flex-col cursor-pointer select-none scroll-mb-24" data-card-wrapper="true">
+    <div class="flex flex-col cursor-pointer select-none scroll-mb-24 p-2 -m-2 [content-visibility:auto] [contain-intrinsic-size:17.2rem_21rem]" data-card-wrapper="true">
       {/* Category header for Hero variants (matching Top Picks in Apple TV) */}
       {variant() === 'hero' && props.categoryLabel && (
         <span class="text-xl font-bold text-neutral-400 tracking-tight mb-2 truncate">
@@ -53,15 +36,14 @@ export const AlbumCard: Component<AlbumCardProps> = (props) => {
         >
           {/* Artwork */}
           {coverUrl() ? (
-            <Show when={isVisible()} fallback={<div class="absolute inset-0 bg-neutral-900" />}>
-              <img
-                src={coverUrl()}
-                alt={props.album.title}
-                onLoad={() => setImgLoaded(true)}
-                class={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${imgLoaded() ? 'opacity-100' : 'opacity-0'}`}
-                decoding="async"
-              />
-            </Show>
+            <img
+              src={coverUrl()}
+              alt={props.album.title}
+              onLoad={() => setImgLoaded(true)}
+              class={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${imgLoaded() ? 'opacity-100' : 'opacity-0'}`}
+              loading="lazy"
+              decoding="async"
+            />
           ) : (
             <div class="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-950 text-neutral-600">
               <MusicNoteIcon class="w-24 h-24" />
@@ -96,15 +78,14 @@ export const AlbumCard: Component<AlbumCardProps> = (props) => {
             data-index={props.index}
           >
             {coverUrl() ? (
-              <Show when={isVisible()} fallback={<div class="w-full h-full bg-neutral-900" />}>
-                <img
-                  src={coverUrl()}
-                  alt={props.album.title}
-                  onLoad={() => setImgLoaded(true)}
-                  class={`w-full h-full object-cover transition-opacity duration-300 ${imgLoaded() ? 'opacity-100' : 'opacity-0'}`}
-                  decoding="async"
-                />
-              </Show>
+              <img
+                src={coverUrl()}
+                alt={props.album.title}
+                onLoad={() => setImgLoaded(true)}
+                class={`w-full h-full object-cover transition-opacity duration-300 ${imgLoaded() ? 'opacity-100' : 'opacity-0'}`}
+                loading="lazy"
+                decoding="async"
+              />
             ) : (
               <div class="w-full h-full flex items-center justify-center bg-neutral-800 text-neutral-600">
                 <MusicNoteIcon class="w-20 h-20" />

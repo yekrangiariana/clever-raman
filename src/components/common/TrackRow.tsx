@@ -48,7 +48,7 @@ export const TrackRow: Component<TrackRowProps> = (props) => {
   return (
     <div
       onClick={() => props.onClick(props.song, props.allSongs, props.index)}
-      class={`min-h-[84px] py-1.5 px-8 rounded-2xl flex items-center justify-between cursor-pointer border shrink-0 transition-all ${
+      class={`min-h-[84px] py-1.5 px-8 rounded-2xl flex items-center justify-between cursor-pointer border shrink-0 transition-colors ${
         props.isPlaying
           ? 'bg-white border-white text-black font-extrabold shadow-xl'
           : 'bg-transparent border-transparent text-neutral-300 hover:bg-neutral-800/60'
@@ -73,7 +73,7 @@ export const TrackRow: Component<TrackRowProps> = (props) => {
       <div class="flex items-center gap-4 shrink-0 ml-4">
         <button
           onClick={handleQueueClick}
-          class={`p-2.5 rounded-full transition-all flex items-center justify-center shadow-md ${
+          class={`p-2.5 rounded-full transition-colors flex items-center justify-center shadow-md ${
             isUserQueued()
               ? 'bg-emerald-600 border border-emerald-400 text-white is-added'
               : 'bg-neutral-800/90 border border-neutral-700/80 text-white hover:bg-neutral-700'
@@ -90,7 +90,7 @@ export const TrackRow: Component<TrackRowProps> = (props) => {
 
         <button
           onClick={handleHeartClick}
-          class={`p-2.5 rounded-full transition-all flex items-center justify-center border shadow-md ${
+          class={`p-2.5 rounded-full transition-colors flex items-center justify-center border shadow-md ${
             isStarred()
               ? 'bg-rose-600/20 border-rose-500/40 text-rose-500 hover:bg-rose-600/30'
               : 'bg-neutral-800/90 border-neutral-700/80 text-neutral-400 hover:text-white hover:bg-neutral-700'

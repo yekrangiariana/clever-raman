@@ -28,45 +28,25 @@
   scroll-margin-bottom: 96px;
 }
 
-/* Card Focus (Grid items, Cover arts, Mix cards) - Fast, Crisp Scale Animation */
-[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):not([data-variant="topPick"]) {
+/* Card Focus (Grid items, Cover arts, Mix cards, Top Picks) - Instant 4px Crisp White Border Ring */
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]) {
   outline: none;
-  will-change: transform;
-  transition: transform 0.12s ease-out !important;
-}
-
-[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):not([data-variant="topPick"]).focused {
-  outline: none !important;
-  transform: scale3d(1.05, 1.05, 1) !important;
-  z-index: 30;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.95) !important;
-}
-
-/* Top Pick Cards Focus (Zero animations/fade-in, instant 0ms white border ring) */
-[data-focusable="true"][data-variant="topPick"] {
   transition: none !important;
   transform: none !important;
 }
 
-[data-focusable="true"][data-variant="topPick"].focused {
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]).focused {
+  outline: none !important;
   transform: none !important;
   transition: none !important;
   box-shadow: 0 0 0 4px #ffffff !important;
   z-index: 30;
 }
 
-[data-focusable="true"][data-variant="topPick"].pressed,
-[data-focusable="true"][data-variant="topPick"]:active {
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]).pressed,
+[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):active {
   transform: none !important;
   transition: none !important;
-}
-
-/* Card Tactile Press Down State (Keydown Enter / Active Click) */
-[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):not([data-variant="topPick"]).pressed,
-[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):not([data-variant="topPick"]):active {
-  transform: scale3d(0.93, 0.93, 1) !important;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 255, 255, 0.7) !important;
-  transition: transform 0.06s ease-out !important;
 }
 
 /* Seek Bar Focus & Press Override (Dimensions & length must stay 100% fixed) */
@@ -86,7 +66,6 @@
   scroll-margin-top: 0 !important;
   scroll-margin-bottom: 0 !important;
   outline: none;
-  will-change: transform;
   transition: none !important;
 }
 
@@ -94,7 +73,6 @@
 [data-focusable="true"][data-variant="list"]:not([data-section="settings"]):not([data-playing="true"]).focused,
 [data-focusable="true"][data-variant="list"]:not([data-section="settings"]):not([data-playing="true"]):has([data-section$="_queue"].focused),
 [data-focusable="true"][data-variant="list"]:not([data-section="settings"]):not([data-playing="true"]):has([data-section$="_heart"].focused) {
-  transform: scale3d(1.008, 1.015, 1) !important;
   background-color: rgba(255, 255, 255, 0.18) !important;
   border-color: rgba(255, 255, 255, 0.45) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 16px rgba(255, 255, 255, 0.1) !important;
@@ -284,21 +262,24 @@ button.is-added * {
 /* Ambient glow container */
 .ambient-glow-bg {
   position: fixed;
-  inset: -15%;
-  width: 130%;
-  height: 130%;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  contain: strict;
 }
 
 .ambient-glow-img {
-  width: 100%;
-  height: 100%;
+  width: 160px;
+  height: 160px;
   object-fit: cover;
-  filter: blur(75px) saturate(155%) brightness(1.08);
-  transform: scale(1.3);
-  will-change: transform;
+  filter: blur(12px) saturate(155%) brightness(1.08);
+  transform: scale(12) translate3d(0, 0, 0);
   pointer-events: none;
   opacity: 0.65;
 }

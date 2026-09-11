@@ -304,6 +304,22 @@ class SubsonicApi {
   }
 
   /**
+   * Get real artist list from Navidrome
+   */
+  public async getArtists(): Promise<{ id: string; name: string }[]> {
+    try {
+      const res = await this.request<{ artists?: { index?: { artist?: { id: string; name: string }[] }[] } }>('getArtists.view');
+      const artists: { id: string; name: string }[] = [];
+      res.artists?.index?.forEach((idx) => {
+        if (idx.artist) artists.push(...idx.artist);
+      });
+      return artists;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
    * Subsonic Search 3 for albums, songs, artists with robust local fallback
    */
   public async search3(query: string, songCount = 20, albumCount = 20, artistCount = 10): Promise<SearchResult> {
@@ -323,22 +339,19 @@ class SubsonicApi {
       const songs = res.searchResult3?.song || [];
       const artists = res.searchResult3?.artist || [];
 
-      if (albums.length > 0 || songs.length > 0 || artists.length > 0) {
-        return { albums, songs, artists };
-      }
+      return { albums, songs, artists };
     } catch (e) {
       console.warn('search3.view failed, falling back to local library search', e);
-    }
-
-    // Fallback: Client-side search across all albums
-    try {
-      const allAlbums = await this.getAlbumList('alphabeticalByName', 500, 0);
-      const matchedAlbums = allAlbums.filter(
-        (a) => a.title.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q)
-      );
-      return { albums: matchedAlbums, songs: [], artists: [] };
-    } catch (e) {
-      return { albums: [], songs: [], artists: [] };
+      // Fallback: Client-side search across all albums only on actual network or server error
+      try {
+        const allAlbums = await this.getAlbumList('alphabeticalByName', 500, 0);
+        const matchedAlbums = allAlbums.filter(
+          (a) => a.title.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q)
+        );
+        return { albums: matchedAlbums, songs: [], artists: [] };
+      } catch (e2) {
+        return { albums: [], songs: [], artists: [] };
+      }
     }
   }
 
@@ -515,9 +528,9 @@ class SubsonicApi {
   }
 
   /**
-   * Get album cover art URL (getCoverArt.view?id=...&size=800)
+   * Get album cover art URL (getCoverArt.view?id=...&size=400)
    */
-  public getCoverArtUrl(id?: string, size = 800): string {
+  public getCoverArtUrl(id?: string, size = 300): string {
     if (!this.config || !id) return '';
     const auth = this.getAuthParams();
     return `${this.config.serverUrl}/rest/getCoverArt.view?${auth}&id=${encodeURIComponent(id)}&size=${size}`;

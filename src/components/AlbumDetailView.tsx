@@ -38,7 +38,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
         title: props.initialPlaylist.name,
         subtitle: 'Subsonic Playlist',
         metadata: `${props.initialPlaylist.songCount} Tracks`,
-        coverArtUrl: props.customCoverVariant ? undefined : api.getCoverArtUrl(props.initialPlaylist.coverArt || props.initialPlaylist.id, 800),
+        coverArtUrl: props.customCoverVariant ? undefined : api.getCoverArtUrl(props.initialPlaylist.coverArt || props.initialPlaylist.id, 500),
         coverVariant: props.customCoverVariant || undefined,
         songs: cached?.songs || [],
         isPlaylist: true,
@@ -52,7 +52,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
         title: props.initialAlbum.title,
         subtitle: props.initialAlbum.artist,
         metadata: `${props.initialAlbum.genre || 'Album'}${props.initialAlbum.year ? ` • ${props.initialAlbum.year}` : ''}${props.initialAlbum.songCount ? ` • ${props.initialAlbum.songCount} Tracks` : ''}`,
-        coverArtUrl: api.getCoverArtUrl(props.initialAlbum.coverArt || props.initialAlbum.id, 800),
+        coverArtUrl: api.getCoverArtUrl(props.initialAlbum.coverArt || props.initialAlbum.id, 500),
         songs: cached?.songs || [],
         albumId: props.initialAlbum.id,
       };
@@ -80,7 +80,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
           title: pl.playlist.name,
           subtitle: 'Subsonic Playlist',
           metadata: `${pl.songs.length} Tracks`,
-          coverArtUrl: props.customCoverVariant ? undefined : api.getCoverArtUrl(pl.playlist.coverArt || pl.playlist.id, 800),
+          coverArtUrl: props.customCoverVariant ? undefined : api.getCoverArtUrl(pl.playlist.coverArt || pl.playlist.id, 500),
           coverVariant: props.customCoverVariant || undefined,
           songs: pl.songs,
           isPlaylist: true,
@@ -118,7 +118,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
             songs.push(...r.value.songs.slice(0, 4));
           }
         });
-        const coverArtUrl = genreAlbums[0] ? api.getCoverArtUrl(genreAlbums[0].coverArt || genreAlbums[0].id, 800) : '';
+        const coverArtUrl = genreAlbums[0] ? api.getCoverArtUrl(genreAlbums[0].coverArt || genreAlbums[0].id, 500) : '';
         return {
           title: `${mixGenre} Mix`,
           subtitle: 'Dynamic Mix',
@@ -136,7 +136,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
           title: res.album.title,
           subtitle: res.album.artist,
           metadata: `${res.album.genre || 'Album'}${res.album.year ? ` • ${res.album.year}` : ''} • ${res.songs.length} Tracks`,
-          coverArtUrl: api.getCoverArtUrl(res.album.coverArt || albumId, 800),
+          coverArtUrl: api.getCoverArtUrl(res.album.coverArt || albumId, 500),
           songs: res.songs,
           albumId,
         };

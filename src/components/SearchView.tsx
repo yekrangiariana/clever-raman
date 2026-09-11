@@ -70,11 +70,16 @@ export const SearchView: Component<SearchViewProps> = (props) => {
     }
   });
 
-  // Fetch real artists list from albums for browse state
+  // Fetch real artists list using lightweight getArtists API
   const [artists] = createResource(sessionVersionSignal, async () => {
     if (cachedArtists) return cachedArtists;
     try {
-      const albums = await api.getAlbumList('alphabeticalByName', 500, 0);
+      const list = await api.getArtists();
+      if (list.length > 0) {
+        cachedArtists = list.map((a) => a.name).sort((a, b) => a.localeCompare(b));
+        return cachedArtists;
+      }
+      const albums = await api.getAlbumList('alphabeticalByName', 100, 0);
       const set = new Set<string>();
       albums.forEach((a) => {
         if (a.artist) set.add(a.artist);

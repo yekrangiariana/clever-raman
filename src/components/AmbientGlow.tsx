@@ -6,7 +6,7 @@ export const AmbientGlow: Component = () => {
   const currentCoverArt = createMemo(() => {
     const track = audioPlayer.currentTrack();
     if (!track) return '';
-    return api.getCoverArtUrl(track.coverArt || track.id, 100);
+    return api.getCoverArtUrl(track.coverArt || track.id, 300);
   });
 
   return (

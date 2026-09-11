@@ -5,6 +5,7 @@ import { profilesSignal, activeProfileSignal, showBootSelectorSignal, setShowBoo
 import { clearHomeCache } from './HomeView';
 import { clearSearchCache } from './SearchView';
 import { clearAlbumCache } from './MainGrid';
+import pkg from '../../package.json';
 import { SettingsIcon, ChevronRightIcon } from './common/Icons';
 
 export const SettingsView: Component = () => {
@@ -269,7 +270,7 @@ export const SettingsView: Component = () => {
 
           <div class="w-full h-20 px-8 rounded-full flex items-center justify-between bg-[#2a2c32]/80 border border-neutral-700/40 text-white shadow-md overflow-hidden">
             <span class="text-3xl font-extrabold tracking-tight">NaviOS</span>
-            <span class="text-2xl font-bold text-neutral-400">Version 1.9.92</span>
+            <span class="text-2xl font-bold text-neutral-400">Version {pkg.version}</span>
           </div>
         </div>
       </div>

@@ -37,7 +37,7 @@ export const NowPlayingView: Component = () => {
     const t = track();
     if (!t) return '';
     if (t.starred) setIsStarred(true);
-    return api.getSongCoverArtUrl(t, 800);
+    return api.getSongCoverArtUrl(t, 500);
   });
 
   const effectiveTime = createMemo(() => {
@@ -105,16 +105,20 @@ export const NowPlayingView: Component = () => {
   const contextIndex = () => audioPlayer.contextIndex();
 
   const upcomingContext = createMemo(() => {
+    if (!showQueue()) return [];
     const cq = contextQueue();
     const cIdx = contextIndex();
     return cIdx < cq.length - 1 ? cq.slice(cIdx + 1) : [];
   });
 
   const pastContext = createMemo(() => {
+    if (!showQueue()) return [];
     const history = audioPlayer.playedHistory();
     const cq = contextQueue();
     const cIdx = contextIndex();
     const pastCq = cIdx > 0 ? cq.slice(0, cIdx) : [];
+
+    if (history.length === 0 && pastCq.length === 0) return [];
 
     const map = new Map<string, Song>();
     history.forEach((s) => map.set(s.id, s));

@@ -18,7 +18,7 @@ export const TrackCard: Component<TrackCardProps> = (props) => {
   return (
     <div
       onClick={() => props.onPlay(props.song, props.allSongs, props.songIndex)}
-      class="flex flex-col cursor-pointer select-none scroll-mb-24"
+      class="flex flex-col cursor-pointer select-none scroll-mb-24 p-2 -m-2 [content-visibility:auto] [contain-intrinsic-size:17.2rem_21rem]"
       data-card-wrapper="true"
     >
       <div
