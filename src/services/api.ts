@@ -86,36 +86,25 @@ class SubsonicApi {
     initProfiles();
     const activeProfile = getActiveProfile();
 
-    let serverUrl = '';
+    let serverUrl = activeProfile?.serverUrl || DEV_CONFIG?.serverUrl || '';
+    let username = activeProfile?.username || DEV_CONFIG?.username || '';
+    let password = activeProfile?.password || DEV_CONFIG?.password || '';
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.serverUrl) serverUrl = parsed.serverUrl;
+        if (parsed.username) username = parsed.username;
+        if (parsed.password !== undefined) password = parsed.password;
       }
     } catch (e) {}
 
-    if (!serverUrl && activeProfile?.serverUrl) {
-      serverUrl = activeProfile.serverUrl;
-    }
-    if (!serverUrl && DEV_CONFIG?.serverUrl) {
-      serverUrl = DEV_CONFIG.serverUrl;
-    }
-
-    if (activeProfile && activeProfile.username && serverUrl) {
+    if (serverUrl && username) {
       this.config = {
         serverUrl: this.sanitizeUrl(serverUrl),
-        username: activeProfile.username,
-        password: activeProfile.password || '',
-      };
-      return this.config;
-    }
-
-    if (DEV_CONFIG && DEV_CONFIG.serverUrl && DEV_CONFIG.username && DEV_CONFIG.password) {
-      this.config = {
-        serverUrl: DEV_CONFIG.serverUrl,
-        username: DEV_CONFIG.username,
-        password: DEV_CONFIG.password,
+        username: username,
+        password: password,
       };
       return this.config;
     }
@@ -173,10 +162,16 @@ class SubsonicApi {
   }
 
   public getConfig(): ServerConfig | null {
+    if (!this.config) {
+      this.loadConfig();
+    }
     return this.config;
   }
 
   private getAuthParams(): string {
+    if (!this.config) {
+      this.loadConfig();
+    }
     if (!this.config) throw new Error('Subsonic API not configured');
     // p=enc:hexPass — password auth, no MD5, no tokens, no salt. Simple and reliable.
     const hexPass = stringToHex(this.config.password);
@@ -184,6 +179,9 @@ class SubsonicApi {
   }
 
   private async request<T>(endpoint: string, params: Record<string, string | number> = {}): Promise<T> {
+    if (!this.config) {
+      this.loadConfig();
+    }
     if (!this.config) throw new Error('Subsonic API not configured');
 
     const query = Object.entries(params)
@@ -220,37 +218,38 @@ class SubsonicApi {
     } catch (e: any) {
       clearTimeout(timeoutId);
       if (e.name === 'AbortError') {
-        throw new Error(`Request timed out after 12s (${endpoint})`);
+        throw new Error(`Request timed out after 12s (${url})`);
       }
       throw e;
     }
   }
 
   public async ping(customConfig?: { serverUrl: string; username: string; password: string }): Promise<boolean> {
-    if (customConfig) {
-      try {
-        const cleanUrl = this.sanitizeUrl(customConfig.serverUrl);
-        const hexPass = stringToHex(customConfig.password);
-        const auth = `u=${encodeURIComponent(customConfig.username.trim())}&p=enc:${hexPass}&v=${API_VERSION}&c=${CLIENT_NAME}&f=json`;
-        const url = `${cleanUrl}/rest/ping.view?${auth}`;
-
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        const data = await res.json();
-        const sub = data['subsonic-response'];
-        if (sub?.status === 'ok') return true;
-        if (sub?.error?.message) throw new Error(`Subsonic error: ${sub.error.message}`);
-        return false;
-      } catch (err: any) {
-        throw new Error(err.message || 'Network error connecting to Navidrome server');
-      }
+    const targetConfig = customConfig || this.getConfig();
+    if (!targetConfig || !targetConfig.serverUrl) {
+      throw new Error('No server URL configured');
     }
 
     try {
-      const res = await this.request<{ status: string }>('ping.view');
-      return res.status === 'ok';
-    } catch (e) {
+      const cleanUrl = this.sanitizeUrl(targetConfig.serverUrl);
+      const hexPass = stringToHex(targetConfig.password);
+      const auth = `u=${encodeURIComponent(targetConfig.username.trim())}&p=enc:${hexPass}&v=${API_VERSION}&c=${CLIENT_NAME}&f=json`;
+      const url = `${cleanUrl}/rest/ping.view?${auth}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText} (${url})`);
+      const data = await res.json();
+      const sub = data['subsonic-response'];
+      if (sub?.status === 'ok') return true;
+      if (sub?.error?.message) throw new Error(`Subsonic error: ${sub.error.message}`);
       return false;
+    } catch (err: any) {
+      throw new Error(err.message || 'Network error connecting to Navidrome server');
     }
   }
 
@@ -430,6 +429,18 @@ class SubsonicApi {
     this.playlistDetailsCache.set(id, result);
 
     return result;
+  }
+
+  public async getRandomSongs(size = 50, genre?: string): Promise<Song[]> {
+    const params: Record<string, string | number> = { size };
+    if (genre) params.genre = genre;
+    try {
+      const res = await this.request<{ randomSongs?: { song?: Song[] } }>('getRandomSongs.view', params);
+      return res.randomSongs?.song || [];
+    } catch (e) {
+      console.error('getRandomSongs failed', e);
+      return [];
+    }
   }
 
   /**

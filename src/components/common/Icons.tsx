@@ -340,3 +340,102 @@ export const RepeatOneIcon: Component<IconProps> = (props) => (
   </svg>
 );
 
+/**
+ * Apple Music 'Listen Now' / Play Circle Home Icon
+ */
+export const HomeMusicIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+  </svg>
+);
+
+/**
+ * Apple Music 'Browse' Grid / Window Icon
+ */
+export const BrowseIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zm-9 9h7v7H4v-7zm9 0h7v7h-7v-7z" />
+  </svg>
+);
+
+/**
+ * Apple Music 'Radio' Antenna Icon
+ */
+export const RadioIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 1a5 5 0 0 0-5 5c0 1.48.65 2.79 1.67 3.71L2 20.38 3.62 22 10.3 15.3A4.95 4.95 0 0 0 12 16a5 5 0 0 0 5-5c0-1.48-.65-2.79-1.67-3.71L22 3.62 20.38 2l-6.68 6.7A4.95 4.95 0 0 0 12 1zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z" />
+  </svg>
+);
+
+/**
+ * Apple Music 'Library' Music Folders Icon
+ */
+export const LibraryMusicIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 5h-3v5.5c0 1.38-1.12 2.5-2.5 2.5S10 13.88 10 12.5s1.12-2.5 2.5-2.5c.57 0 1.08.19 1.5.51V5h4v2zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z" />
+  </svg>
+);
+
+/**
+ * Apple Music Lyrics Quote Icon
+ */
+export const LyricsIcon: Component<IconProps> = (props) => (
+  <svg
+    class={props.class || "w-6 h-6"}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    <path d="M8 9h8M8 13h5" />
+  </svg>
+);
+
+/**
+ * AirPlay / Output Audio Icon
+ */
+export const AirPlayIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M6 22h12l-6-6-6 6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v12h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
+  </svg>
+);
+
+/**
+ * Chevron Down / Dismiss Icon
+ */
+export const ChevronDownIcon: Component<IconProps> = (props) => (
+  <svg
+    class={props.class || "w-6 h-6"}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width="2.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M19 9l-7 7-7-7" />
+  </svg>
+);
+
+/**
+ * Volume High Icon
+ */
+export const VolumeIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+  </svg>
+);
+
+/**
+ * Ellipsis Horizontal (More Actions) Icon
+ */
+export const EllipsisIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+  </svg>
+);
+
+

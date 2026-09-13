@@ -1,5 +1,6 @@
 import { createSignal, createRoot, createMemo } from 'solid-js';
 import { api, Song } from './api';
+import { MediaSession } from '@capgo/capacitor-media-session';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -108,17 +109,22 @@ function createAudioPlayer() {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = state;
     }
+    try {
+      MediaSession.setPlaybackState({ playbackState: state }).catch(() => {});
+    } catch (e) {}
   }
 
   function updateMediaSessionMetadata(track: Song) {
+    const coverUrl = api.getCoverArtUrl(track.coverArt || track.id, 800);
+    const metadata = {
+      title: track.title || 'Unknown Title',
+      artist: track.artist || 'Unknown Artist',
+      album: track.album || '',
+      artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/png' }] : [],
+    };
+
     if ('mediaSession' in navigator) {
-      const coverUrl = api.getCoverArtUrl(track.coverArt || track.id, 800);
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.title || 'Unknown Title',
-        artist: track.artist || 'Unknown Artist',
-        album: track.album || '',
-        artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/png' }] : [],
-      });
+      navigator.mediaSession.metadata = new MediaMetadata(metadata);
 
       navigator.mediaSession.setActionHandler('play', () => play());
       navigator.mediaSession.setActionHandler('pause', () => pause());
@@ -130,10 +136,21 @@ function createAudioPlayer() {
             seek(details.seekTime);
           }
         });
-      } catch (e) {
-        // seekto fallback
-      }
+      } catch (e) {}
     }
+
+    try {
+      MediaSession.setMetadata(metadata).catch(() => {});
+      MediaSession.setActionHandler({ action: 'play' }, () => play()).catch(() => {});
+      MediaSession.setActionHandler({ action: 'pause' }, () => pause()).catch(() => {});
+      MediaSession.setActionHandler({ action: 'previoustrack' }, () => previousTrack()).catch(() => {});
+      MediaSession.setActionHandler({ action: 'nexttrack' }, () => nextTrack()).catch(() => {});
+      MediaSession.setActionHandler({ action: 'seekto' }, (details) => {
+        if (details.seekTime != null) {
+          seek(details.seekTime);
+        }
+      }).catch(() => {});
+    } catch (e) {}
   }
 
   function shuffleArray<T>(arr: T[]): T[] {
@@ -194,14 +211,18 @@ function createAudioPlayer() {
       recordHistory(prevTrack);
     }
     setCurrentTrack(track);
-    const streamUrl = api.getStreamUrl(track.id);
-    audio.src = streamUrl;
-    audio.play().catch((err) => {
-      if (err.name !== 'AbortError') {
-        console.error('Failed to start audio playback', err);
-      }
-    });
-    updateMediaSessionMetadata(track);
+    
+    // Defer network and audio pipeline initialization to let UI paint first
+    setTimeout(() => {
+      const streamUrl = api.getStreamUrl(track.id);
+      audio.src = streamUrl;
+      audio.play().catch((err) => {
+        if (err.name !== 'AbortError') {
+          console.error('Failed to start audio playback', err);
+        }
+      });
+      updateMediaSessionMetadata(track);
+    }, 50);
   }
 
   /**

@@ -147,7 +147,6 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
     { initialValue: initialData() }
   );
 
-  const [visibleLimit, setVisibleLimit] = createSignal(50);
   createEffect(() => {
     const songs = data().songs;
     
@@ -158,20 +157,12 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
     } else {
       focusEngine.setSectionLength('albumDetail', headerCount);
     }
-
-    setVisibleLimit(50);
-    if (songs && songs.length > 50) {
-      const timer = setTimeout(() => {
-        setVisibleLimit(songs.length);
-      }, 400);
-      onCleanup(() => clearTimeout(timer));
-    }
   });
 
   const visibleSongs = createMemo(() => {
     const songs = data().songs;
     if (!songs) return [];
-    return songs.slice(0, visibleLimit());
+    return songs;
   });
 
   const currentTrackId = () => audioPlayer.currentTrack()?.id;
@@ -179,7 +170,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
   function handleTrackClick(song: Song, allSongs: Song[], index: number) {
     if (song.id === currentTrackId()) {
       focusEngine.setActiveModal('nowPlaying');
-      focusEngine.setFocus('nowPlaying', 2);
+      focusEngine.setFocus('nowPlaying', 1);
     } else {
       audioPlayer.playTrack(allSongs[index], allSongs, index);
     }

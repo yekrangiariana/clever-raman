@@ -358,10 +358,18 @@ export const NowPlayingView: Component = () => {
               <For each={pastContext()}>
                 {(song, pastIndex) => {
                   return (
-                    <div class="flex flex-col w-full opacity-45 hover:opacity-80 transition-opacity">
+                    <div class="flex flex-col w-full opacity-45 hover:opacity-80 transition-opacity [content-visibility:auto] [contain-intrinsic-size:0_6rem]">
                       <div
                         onClick={() => {
-                          audioPlayer.playHistoryItem(song);
+                          const hIdx = audioPlayer.playedHistory().findIndex((s) => s.id === song.id);
+                          if (hIdx >= 0) {
+                            audioPlayer.playHistoryItem(song);
+                          } else {
+                            const cIdx = audioPlayer.contextQueue().findIndex((s) => s.id === song.id);
+                            if (cIdx >= 0) {
+                              audioPlayer.jumpToContextIndex(cIdx);
+                            }
+                          }
                         }}
                         class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-transparent text-neutral-300 hover:bg-neutral-800/60"
                         data-focusable="true"
@@ -451,7 +459,7 @@ export const NowPlayingView: Component = () => {
               <For each={userQueue()}>
                 {(song, uqIndex) => {
                   return (
-                    <div class="flex flex-col w-full">
+                    <div class="flex flex-col w-full [content-visibility:auto] [contain-intrinsic-size:0_6rem]">
                       <div
                         onClick={() => audioPlayer.jumpToUserQueueIndex(uqIndex())}
                         class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-transparent text-neutral-200 hover:bg-neutral-800/60"
@@ -525,7 +533,7 @@ export const NowPlayingView: Component = () => {
                 {(song, relIndex) => {
                   const actualContextIndex = contextIndex() + 1 + relIndex();
                   return (
-                    <div class="flex flex-col w-full">
+                    <div class="flex flex-col w-full [content-visibility:auto] [contain-intrinsic-size:0_6rem]">
                       <div
                         onClick={() => audioPlayer.jumpToContextIndex(actualContextIndex)}
                         class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-transparent text-neutral-200 hover:bg-neutral-800/60"

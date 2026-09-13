@@ -38,7 +38,7 @@ function setAlbumCache(key: string, list: Album[]) {
 
 export async function prefetchAlbums(): Promise<void> {
   if (!api.isConfigured()) return;
-  const cacheKey = 'all_alphabeticalByName_50';
+  const cacheKey = 'all_alphabeticalByName_0';
   if (albumCache.has(cacheKey) && albumCache.get(cacheKey)!.length > 0) return;
 
   try {
@@ -82,28 +82,33 @@ export const MainGrid: Component<MainGridProps> = (props) => {
       }
       
       const currentOffset = reset ? 0 : pageOffset();
-      let list: Album[] = [];
+      let rawList: Album[] = [];
       const cacheKey = `${props.selectedGenre || 'all'}_${type}_${currentOffset}`;
 
       if (albumCache.has(cacheKey) && albumCache.get(cacheKey)!.length > 0) {
-        list = albumCache.get(cacheKey)!;
+        rawList = albumCache.get(cacheKey)!;
       } else {
-        list = await api.getAlbumList(type, 50, currentOffset, props.selectedGenre || undefined);
-        if (list && list.length > 0) setAlbumCache(cacheKey, list);
+        rawList = await api.getAlbumList(type, 50, currentOffset, props.selectedGenre || undefined);
+        if (rawList && rawList.length > 0) setAlbumCache(cacheKey, rawList);
       }
 
-      if (props.selectedArtist) {
-        list = list.filter((a) => a.artist === props.selectedArtist);
-      }
-
-      if (list.length < 50) {
+      if (rawList.length < 50) {
         setHasMore(false);
       }
 
+      let filteredList = rawList;
+      if (props.selectedArtist) {
+        filteredList = rawList.filter((a) => a.artist === props.selectedArtist);
+      }
+
       if (reset) {
-        setAlbums(list);
+        setAlbums(filteredList);
       } else {
-        setAlbums((prev) => [...prev, ...list]);
+        setAlbums((prev) => {
+          const existingIds = new Set(prev.map((a) => a.id));
+          const uniqueNew = filteredList.filter((a) => !existingIds.has(a.id));
+          return [...prev, ...uniqueNew];
+        });
       }
       
       setPageOffset(currentOffset + 50);

@@ -43,8 +43,8 @@
   z-index: 30;
 }
 
-[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]).pressed,
-[data-focusable="true"]:not([data-variant="list"]):not([data-variant="seekBar"]):active {
+[data-focusable="true"]:not([data-variant="seekBar"]).pressed,
+[data-focusable="true"]:not([data-variant="seekBar"]):active {
   transform: none !important;
   transition: none !important;
 }
@@ -121,9 +121,8 @@
 /* List Row Pressed State */
 [data-focusable="true"][data-variant="list"].pressed,
 [data-focusable="true"][data-variant="list"]:active {
-  transform: scale3d(0.97, 0.97, 1) !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4) !important;
-  transition: transform 0.06s ease-out !important;
+  transform: none !important;
+  transition: none !important;
 }
 
 /* Single-Song Queue Button Focus Styling (Enlarge + crisp focus ring) */
@@ -241,7 +240,7 @@ button.is-added * {
 
 [data-section="exitConfirm"].pressed,
 [data-section="exitConfirm"]:active {
-  transform: scale3d(0.97, 0.97, 1) !important;
+  transform: none !important;
 }
 
 /* Strictly forbidden: backdrop-filter: blur(...) */

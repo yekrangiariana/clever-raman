@@ -1,7 +1,7 @@
 {
   "name": "navios",
   "private": true,
-  "version": "1.9.104",
+  "version": "1.9.109",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,9 +10,14 @@
     "package": "vite build && node scripts/pack-ipk.js"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^7.6.9",
+    "@capacitor/core": "^8.5.2",
+    "@capgo/capacitor-media-session": "^8.0.30",
     "solid-js": "^1.9.4"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@tailwindcss/vite": "^4.0.9",
     "tailwindcss": "^4.0.9",
     "typescript": "^5.7.3",

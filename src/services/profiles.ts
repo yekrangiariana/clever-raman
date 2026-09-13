@@ -154,6 +154,19 @@ export function bumpSessionVersion(): void {
 export function initProfiles(): UserProfile[] {
   let profiles = getProfiles();
   if (profiles.length > 0) {
+    // If active profile is missing serverUrl but DEV_CONFIG has it, fill it in
+    if (DEV_CONFIG?.serverUrl) {
+      let modified = false;
+      profiles = profiles.map((p) => {
+        if (!p.serverUrl) {
+          modified = true;
+          return { ...p, serverUrl: DEV_CONFIG.serverUrl, password: p.password || DEV_CONFIG.password || '' };
+        }
+        return p;
+      });
+      if (modified) saveProfiles(profiles);
+    }
+
     const activeId = getActiveProfileId();
     if (!activeId || !profiles.some((p) => p.id === activeId)) {
       setActiveProfileId(profiles[0].id);
@@ -165,7 +178,7 @@ export function initProfiles(): UserProfile[] {
     return profiles;
   }
 
-  // Auto-migration from legacy single-user config
+  // Auto-migration or default profile from devConfig
   let initialConfig: { serverUrl?: string; username?: string; password?: string } | null = null;
   try {
     const saved = localStorage.getItem(LEGACY_STORAGE_KEY) || localStorage.getItem(OLD_LEGACY_STORAGE_KEY);
@@ -176,13 +189,13 @@ export function initProfiles(): UserProfile[] {
     console.error('Error reading legacy config', e);
   }
 
-  if (!initialConfig && DEV_CONFIG && DEV_CONFIG.serverUrl && DEV_CONFIG.username && DEV_CONFIG.password) {
+  if ((!initialConfig || !initialConfig.username) && DEV_CONFIG && DEV_CONFIG.serverUrl && DEV_CONFIG.username) {
     initialConfig = DEV_CONFIG;
   }
 
   if (initialConfig && initialConfig.username) {
     const defaultProfile: UserProfile = {
-      id: `profile_${Date.now()}`,
+      id: 'default_admin',
       name: initialConfig.username.charAt(0).toUpperCase() + initialConfig.username.slice(1),
       username: initialConfig.username,
       password: initialConfig.password || '',

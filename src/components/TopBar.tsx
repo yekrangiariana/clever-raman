@@ -19,7 +19,7 @@ export const TopBar: Component = () => {
   const handleSelectTab = (tabId: string, index: number) => {
     if (tabId === 'nowPlaying') {
       focusEngine.setActiveModal('nowPlaying');
-      focusEngine.setFocus('nowPlaying', 2);
+      focusEngine.setFocus('nowPlaying', 1);
     } else if (tabId === 'settings') {
       focusEngine.setActiveModal('none');
       focusEngine.setActiveTab('settings');

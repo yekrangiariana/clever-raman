@@ -127,7 +127,7 @@ export const SearchView: Component<SearchViewProps> = (props) => {
   function handlePlaySong(song: Song) {
     audioPlayer.playTrack(song, [song], 0);
     focusEngine.setActiveModal('nowPlaying');
-    focusEngine.setFocus('nowPlaying', 2);
+    focusEngine.setFocus('nowPlaying', 1);
   }
 
   createEffect(() => {

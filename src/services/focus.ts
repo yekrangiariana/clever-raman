@@ -133,7 +133,7 @@ function createFocusEngine() {
             const parentRect = scrollParent.getBoundingClientRect();
             if (isListVariant) {
               const targetRect = listRow.getBoundingClientRect();
-              const leadDistance = targetRect.height + 20;
+              const leadDistance = parentRect.height / 3;
               const bottomThreshold = parentRect.bottom - leadDistance;
               const topThreshold = parentRect.top + leadDistance;
               if (targetRect.bottom > bottomThreshold) {
@@ -711,23 +711,17 @@ function createFocusEngine() {
       const removeBtn = document.querySelector(`[data-section="nowPlayingQueue_remove"][data-index="${index}"]`);
       if (removeBtn) {
         setFocus('nowPlayingQueue_remove' as FocusSection, index);
-      } else {
-        setFocus('nowPlaying', 6);
       }
     } else if (section === 'nowPlayingQueue_remove') {
-      setFocus('nowPlaying', 6);
+      // Reached the right edge
     } else if (section.endsWith('_queue')) {
       const heartSection = section.replace('_queue', '_heart') as FocusSection;
       const heartBtn = document.querySelector(`[data-section="${heartSection}"][data-index="${index}"]`);
       if (heartBtn) {
         setFocus(heartSection, index);
-      } else {
-        const baseSection = section.replace('_queue', '') as FocusSection;
-        setFocus(baseSection, index);
       }
     } else if (section.endsWith('_heart')) {
-      const baseSection = section.replace('_heart', '') as FocusSection;
-      setFocus(baseSection, index);
+      // Reached the right edge
     } else if (section === 'search_mode') {
       if (index === 0) {
         setFocus('search_mode', 1);

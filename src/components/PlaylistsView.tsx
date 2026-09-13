@@ -62,7 +62,7 @@ export const PlaylistsView: Component<PlaylistsViewProps> = (props) => {
         <div class="grid grid-cols-4 gap-10 pb-24">
           <For each={playlists()}>
             {(pl, index) => {
-              const coverUrl = () => api.getCoverArtUrl(pl.coverArt || pl.id, 400);
+              const coverUrl = () => api.getCoverArtUrl(pl.coverArt || pl.id, 300);
               return (
                 <div
                   onClick={() => props.onSelectPlaylist(pl)}

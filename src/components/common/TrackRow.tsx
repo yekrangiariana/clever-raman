@@ -48,7 +48,7 @@ export const TrackRow: Component<TrackRowProps> = (props) => {
   return (
     <div
       onClick={() => props.onClick(props.song, props.allSongs, props.index)}
-      class={`min-h-[84px] py-1.5 px-8 rounded-2xl flex items-center justify-between cursor-pointer border shrink-0 transition-colors ${
+      class={`min-h-[84px] py-1.5 px-8 rounded-2xl flex items-center justify-between cursor-pointer border shrink-0 transition-colors [content-visibility:auto] [contain-intrinsic-size:0_5.5rem] ${
         props.isPlaying
           ? 'bg-white border-white text-black font-extrabold shadow-xl'
           : 'bg-transparent border-transparent text-neutral-300 hover:bg-neutral-800/60'
