@@ -1,4 +1,6 @@
-import { Component, createSignal, Show } from 'solid-js';
+import { Component, createSignal, Show, onMount, onCleanup } from 'solid-js';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { Album, Playlist } from '../../services/api';
 import { MobileHomeView } from './MobileHomeView';
 import { MobileLibraryView } from './MobileLibraryView';
@@ -58,6 +60,23 @@ export const MobileShell: Component = () => {
     search: 'Search',
     settings: 'Settings',
   };
+
+  onMount(() => {
+    if (Capacitor.isNativePlatform()) {
+      const listener = App.addListener('backButton', () => {
+        if (showNowPlaying()) {
+          setShowNowPlaying(false);
+        } else if (selectedAlbum() || selectedPlaylist() || selectedMixGenre()) {
+          handleCloseDetail();
+        } else {
+          App.exitApp();
+        }
+      });
+      onCleanup(() => {
+        listener.then(l => l.remove());
+      });
+    }
+  });
 
   return (
     <div class="fixed inset-0 w-full h-full bg-[#000000] text-white flex flex-col justify-between overflow-hidden select-none font-sans">

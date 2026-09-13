@@ -531,7 +531,27 @@ function createAudioPlayer() {
     const uq = userQueue();
     if (index >= 0 && index < uq.length) {
       const song = uq[index];
-      removeFromUserQueueByIndex(index);
+      
+      const newHistory = [...playedHistory()];
+      const curr = currentTrack();
+      if (curr) newHistory.push(curr);
+      
+      for (let i = 0; i < index; i++) {
+        newHistory.push(uq[i]);
+      }
+      setPlayedHistory(newHistory);
+      
+      const tracksToRemove = new Set<string>();
+      for (let i = 0; i <= index; i++) {
+        tracksToRemove.add(uq[i].id);
+      }
+      
+      setUserQueue(uq.slice(index + 1));
+      
+      const nextSet = new Set(explicitSingleQueueIds());
+      tracksToRemove.forEach((id) => nextSet.delete(id));
+      setExplicitSingleQueueIds(nextSet);
+      
       startPlaybackStream(song);
     }
   }
@@ -548,6 +568,21 @@ function createAudioPlayer() {
         if (hIdx >= 0) {
           setPlayedHistory(history.slice(0, hIdx));
         }
+      } else if (index > contextIndex()) {
+        const newHistory = [...playedHistory()];
+        const curr = currentTrack();
+        if (curr) newHistory.push(curr);
+        
+        const uq = userQueue();
+        uq.forEach(s => newHistory.push(s));
+        
+        for (let i = contextIndex() + 1; i < index; i++) {
+          newHistory.push(cq[i]);
+        }
+        setPlayedHistory(newHistory);
+        
+        setUserQueue([]);
+        setExplicitSingleQueueIds(new Set<string>());
       }
       
       setContextIndex(index);
@@ -561,7 +596,14 @@ function createAudioPlayer() {
   }
 
   function removeFromQueue(index: number, _silent = false) {
-    removeFromUserQueueByIndex(index);
+    const uq = userQueue();
+    if (index < uq.length) {
+      removeFromUserQueueByIndex(index);
+    } else {
+      const contextOffset = index - uq.length;
+      const targetCtxIdx = contextIndex() + 1 + contextOffset;
+      removeFromContextQueueByIndex(targetCtxIdx);
+    }
   }
 
   function removeFromQueueBySongId(songId: string) {

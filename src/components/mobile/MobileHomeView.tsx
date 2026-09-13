@@ -162,7 +162,7 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
             <h2 class="text-xl font-black text-white tracking-tight">Top Picks & Stations</h2>
           </div>
 
-          <div class="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 snap-x snap-mandatory">
+          <div class="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none -mx-4 pl-4 scroll-pl-4 snap-x snap-mandatory after:content-[''] after:w-4 after:shrink-0">
             <For each={dailyTopPicks()}>
               {(pick, idx) => (
                 <div class="w-[75vw] sm:w-[clamp(16rem,35vw,24rem)] shrink-0 snap-start active:scale-95 transition-transform">
@@ -190,7 +190,7 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
           <h2 class="text-xl font-black text-white tracking-tight mb-3">
             Favorites & Starred
           </h2>
-          <div class="flex gap-3.5 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 snap-x">
+          <div class="flex gap-3.5 overflow-x-auto pb-2 scrollbar-none -mx-4 pl-4 scroll-pl-4 snap-x after:content-[''] after:w-4 after:shrink-0">
             <For each={homeData()?.starredAlbums}>
               {(album) => (
                 <div

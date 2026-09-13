@@ -1,4 +1,5 @@
 import { Component, Show } from 'solid-js';
+import { APP_NAME } from "../../config/constants";
 import { PlayIcon, MusicNoteIcon } from './Icons';
 
 export interface TopPickCardProps {
@@ -16,7 +17,7 @@ export interface TopPickCardProps {
 export const TopPickCard: Component<TopPickCardProps> = (props) => {
   return (
     <div class="flex flex-col cursor-pointer select-none w-full scroll-mb-24 @container [content-visibility:auto] [contain-intrinsic-size:19.5rem_27.5rem]" data-card-wrapper="true">
-      <span class="font-extrabold tracking-tight mb-2 md:mb-3 ml-1.5 md:ml-2 truncate uppercase md:normal-case text-[clamp(0.875rem,7cqi,1.5rem)] text-neutral-400 md:text-neutral-300">
+      <span class="font-extrabold tracking-tight mb-2 md:mb-3 truncate uppercase md:normal-case text-[clamp(0.875rem,7cqi,1.5rem)] text-neutral-400 md:text-neutral-300">
         {props.categoryLabel || 'Top Pick'}
       </span>
 
@@ -48,7 +49,7 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
 
             {/* Brand Tag Top-Right */}
             <div class="absolute top-3 right-3 md:top-4 md:right-4 z-20 flex items-center gap-1 px-2.5 py-0.5 md:px-3 md:py-1 rounded-full bg-black/80 text-white/95 border border-white/10 shadow-md pointer-events-none">
-              <span class="font-black tracking-wider uppercase text-[clamp(10px,4cqi,1rem)]">NaviOS</span>
+              <span class="font-black tracking-wider uppercase text-[clamp(10px,4cqi,1rem)]">{APP_NAME}</span>
             </div>
 
             {/* Floating Artwork Container with 3D shadow & glass ring */}
@@ -93,7 +94,7 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
             <div class="w-full aspect-square relative flex items-center justify-center overflow-hidden">
               {/* Brand Tag Top-Right */}
               <div class="absolute top-3 right-3 md:top-4 md:right-4 z-20 flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-black/40 text-white/95 shadow-md">
-                <span class="font-black tracking-wider uppercase text-[clamp(10px,4cqi,1rem)]">NaviOS</span>
+                <span class="font-black tracking-wider uppercase text-[clamp(10px,4cqi,1rem)]">{APP_NAME}</span>
               </div>
 
               {/* Concentric Pulse Circles with Play Button */}
@@ -127,7 +128,7 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
             <div class="w-full aspect-square relative bg-neutral-950 flex items-center justify-center overflow-hidden">
               {/* Brand Tag Top-Right */}
               <div class="absolute top-3 right-3 md:top-4 md:right-4 z-20 flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-black/80 text-white/95 border border-white/10 shadow-sm">
-                <span class="font-black tracking-wider uppercase text-[clamp(10px,4cqi,0.875rem)]">NaviOS</span>
+                <span class="font-black tracking-wider uppercase text-[clamp(10px,4cqi,0.875rem)]">{APP_NAME}</span>
               </div>
 
               <Show
@@ -167,7 +168,7 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
           >
             {/* Brand Tag Top-Right */}
             <div class="absolute top-3 right-3 md:top-4 md:right-4 z-20 flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-black/40 text-white/95 shadow-md">
-              <span class="font-black tracking-wider uppercase text-[clamp(10px,4cqi,1rem)]">NaviOS</span>
+              <span class="font-black tracking-wider uppercase text-[clamp(10px,4cqi,1rem)]">{APP_NAME}</span>
             </div>
 
             {/* Large Stacked Headline */}
@@ -217,7 +218,7 @@ export const TopPickCard: Component<TopPickCardProps> = (props) => {
             >
               {/* Brand Tag Top-Right */}
               <div class="absolute top-3 right-3 md:top-4 md:right-4 z-20 flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-black/40 text-white/95 shadow-md">
-                <span class="font-black tracking-wider uppercase text-[clamp(10px,4cqi,1rem)]">NaviOS</span>
+                <span class="font-black tracking-wider uppercase text-[clamp(10px,4cqi,1rem)]">{APP_NAME}</span>
               </div>
               <div class="relative z-20 mt-auto mb-auto flex flex-col items-center justify-center text-center w-full px-1">
                 <h3

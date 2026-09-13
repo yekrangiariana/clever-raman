@@ -1,4 +1,5 @@
 import { DEV_CONFIG } from '../config/devConfig';
+import { APP_NAME } from "../config/constants";
 import { initProfiles, getActiveProfile, setActiveProfileId, getProfiles, bumpSessionVersion } from './profiles';
 
 export interface ServerConfig {
@@ -65,7 +66,7 @@ export interface SearchResult {
 
 const STORAGE_KEY = 'navios_config';
 const API_VERSION = '1.16.1';
-const CLIENT_NAME = 'NaviOS';
+const CLIENT_NAME = APP_NAME;
 
 function stringToHex(str: string): string {
   let hex = '';

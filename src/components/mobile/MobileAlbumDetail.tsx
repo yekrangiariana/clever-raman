@@ -28,12 +28,8 @@ function formatDuration(sec: number): string {
 
 export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
   const [isStarred, setIsStarred] = createSignal(false);
-  const [toastMessage, setToastMessage] = createSignal<string | null>(null);
+  const [recentlyQueued, setRecentlyQueued] = createSignal<Set<string>>(new Set());
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2000);
-  };
 
   const [detailData] = createResource(
     () => ({
@@ -250,14 +246,32 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
                     onClick={(e) => {
                       e.stopPropagation();
                       audioPlayer.addToUserQueue(song, false, true);
-                      showToast('Added to Queue');
+                      setRecentlyQueued((prev) => new Set(prev).add(song.id));
+                      setTimeout(() => {
+                        setRecentlyQueued((prev) => {
+                          const next = new Set(prev);
+                          next.delete(song.id);
+                          return next;
+                        });
+                      }, 2000);
                     }}
-                    class="p-1 active:scale-90 text-neutral-400 hover:text-white transition-colors focus:outline-none"
+                    class={`p-1 active:scale-90 transition-colors focus:outline-none ${
+                      recentlyQueued().has(song.id) ? 'text-green-400' : 'text-neutral-400 hover:text-white'
+                    }`}
                     aria-label="Add to Queue"
                   >
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
+                    <Show 
+                      when={recentlyQueued().has(song.id)}
+                      fallback={
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                      }
+                    >
+                      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </Show>
                   </button>
                   <span class="text-xs text-neutral-500 font-mono w-9 text-right">
                     {formatDuration(song.duration)}
@@ -270,12 +284,6 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
         <div class="h-16" />
       </div>
 
-      {/* Floating Toast */}
-      <Show when={toastMessage()}>
-        <div class="fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 bg-neutral-800 text-white text-sm font-bold rounded-full shadow-lg z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          {toastMessage()}
-        </div>
-      </Show>
     </div>
   );
 };

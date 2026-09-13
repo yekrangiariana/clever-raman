@@ -365,6 +365,34 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
           </div>
 
           <div class="flex-1 overflow-y-auto py-3 space-y-1 divide-y divide-white/5" ref={scrollContainer}>
+            <For each={audioPlayer.playedHistory()}>
+              {(song: Song) => (
+                <div
+                  onClick={() => audioPlayer.playHistoryItem(song)}
+                  class="flex items-center justify-between py-2.5 px-3 rounded-xl transition-colors opacity-50 hover:bg-white/5 text-neutral-300 cursor-pointer"
+                >
+                  <div class="flex items-center gap-3 min-w-0 flex-1">
+                    <div class="w-10 h-10 rounded-lg bg-neutral-800 overflow-hidden shrink-0 grayscale brightness-75">
+                      <img
+                        src={api.getSongCoverArtUrl(song, 120)}
+                        alt={song.title}
+                        class="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-semibold truncate leading-tight">{song.title}</p>
+                      <p class="text-xs text-neutral-400 truncate mt-0.5">{song.artist}</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 shrink-0 ml-2">
+                    <span class="text-xs text-neutral-500 font-mono">
+                      {formatDuration(song.duration)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </For>
+
             <For each={audioPlayer.queue()}>
               {(song: Song, idx) => {
                 const isCurrent = () => audioPlayer.currentTrack()?.id === song.id;

@@ -1,4 +1,5 @@
 import { Component, createSignal, Show } from 'solid-js';
+import { APP_NAME } from "../../config/constants";
 import { api } from '../../services/api';
 import {
   activeProfileSignal,
@@ -184,7 +185,7 @@ export const MobileSettingsView: Component = () => {
             <span class="text-xs text-[#fa243c] font-bold">Clear</span>
           </div>
           <div class="p-4 flex items-center justify-between text-neutral-400 text-xs">
-            <span>NaviOS Version</span>
+            <span>{APP_NAME} Version</span>
             <span class="font-mono text-neutral-300 font-bold">{pkg.version}</span>
           </div>
         </div>

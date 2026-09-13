@@ -1,4 +1,5 @@
 import { Component, For, Show, createResource, createSignal, createMemo, createEffect, onCleanup } from 'solid-js';
+import { APP_NAME } from "../config/constants";
 import { api, Song, Album, Playlist } from '../services/api';
 import { audioPlayer } from '../services/audio';
 import { focusEngine } from '../services/focus';
@@ -250,7 +251,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
           {data().coverVariant === 'station' ? (
             /* Daily Random Discovery — matches station TopPickCard design */
             <div class="w-full h-full flex items-center justify-center bg-gradient-to-b from-[#e51d48] to-[#be123c] relative">
-              <div class="absolute top-4 right-5 text-white font-black text-sm opacity-90 tracking-tight">NaviOS</div>
+              <div class="absolute top-4 right-5 text-white font-black text-sm opacity-90 tracking-tight">{APP_NAME}</div>
               <div class="w-60 h-60 rounded-full bg-white/10 flex items-center justify-center">
                 <div class="w-44 h-44 rounded-full bg-white/15 flex items-center justify-center">
                   <div class="w-32 h-32 rounded-full bg-white/25 flex items-center justify-center shadow-inner">
@@ -271,7 +272,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
                 class="absolute inset-0 pointer-events-none opacity-10"
                 style={{ 'background-image': 'url(./noise.png)', 'background-repeat': 'repeat' }}
               />
-              <div class="absolute top-4 right-5 text-white font-black text-sm opacity-90 tracking-tight">NaviOS</div>
+              <div class="absolute top-4 right-5 text-white font-black text-sm opacity-90 tracking-tight">{APP_NAME}</div>
               <div class="relative z-10 mt-auto mb-auto flex flex-col items-center justify-center text-center w-full">
                 <h3
                   class={`font-black text-white leading-[1.05] tracking-tighter uppercase w-full px-4 ${
@@ -304,7 +305,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
                 class="absolute inset-0 pointer-events-none opacity-10"
                 style={{ 'background-image': 'url(./noise.png)', 'background-repeat': 'repeat' }}
               />
-              <div class="absolute top-4 right-5 text-white font-black text-sm opacity-90 tracking-tight">NaviOS</div>
+              <div class="absolute top-4 right-5 text-white font-black text-sm opacity-90 tracking-tight">{APP_NAME}</div>
               <div class="relative z-10 mt-6">
                 <h3 class="text-5xl font-black text-white leading-[1.05] tracking-tight">
                   Favorites<br />Mix
