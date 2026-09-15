@@ -33,8 +33,10 @@ function createAudioPlayer() {
   const [originalContextQueue, setOriginalContextQueue] = createSignal<Song[]>([]);
   const [contextIndex, setContextIndex] = createSignal<number>(0);
 
-  // Layer 2: User Queue (Explicitly queued songs by user)
-  const [userQueue, setUserQueue] = createSignal<Song[]>([]);
+  // Layer 2a: User Queue Next (plays before context queue resumes)
+  const [userQueueNext, setUserQueueNext] = createSignal<Song[]>([]);
+  // Layer 2b: User Queue Last (plays after context queue finishes)
+  const [userQueueLast, setUserQueueLast] = createSignal<Song[]>([]);
 
   // Layer 3: Played History (Tracks that finished playing during current session)
   const [playedHistory, setPlayedHistory] = createSignal<Song[]>([]);
@@ -53,24 +55,26 @@ function createAudioPlayer() {
 
   // Unified derived upcoming count: manual songs + upcoming songs in context
   const upcomingCount = createMemo(() => {
-    const uqLen = userQueue().length;
+    const uqLen = userQueueNext().length + userQueueLast().length;
     const cqLen = contextQueue().length;
     const cIdx = contextIndex();
     const remainingContext = Math.max(0, cqLen - 1 - cIdx);
     return uqLen + remainingContext;
   });
 
-  // Flat queue representation for components that need a combined view
+  // Flat queue: [current, ...playNext, ...upcomingContext, ...playLast]
   const queue = createMemo(() => {
     const curr = currentTrack();
-    const uq = userQueue();
+    const uqNext = userQueueNext();
+    const uqLast = userQueueLast();
     const cq = contextQueue();
     const cIdx = contextIndex();
     const upcomingContext = cIdx < cq.length - 1 ? cq.slice(cIdx + 1) : [];
     return [
       ...(curr ? [curr] : []),
-      ...uq,
+      ...uqNext,
       ...upcomingContext,
+      ...uqLast,
     ];
   });
 
@@ -205,9 +209,9 @@ function createAudioPlayer() {
     showToast(label);
   }
 
-  function startPlaybackStream(track: Song, isRewind = false) {
+  function startPlaybackStream(track: Song, isRewind = false, skipHistoryRecording = false) {
     const prevTrack = currentTrack();
-    if (prevTrack && prevTrack.id !== track.id && !isRewind) {
+    if (prevTrack && prevTrack.id !== track.id && !isRewind && !skipHistoryRecording) {
       recordHistory(prevTrack);
     }
     setCurrentTrack(track);
@@ -233,7 +237,8 @@ function createAudioPlayer() {
   function playTrack(track: Song, collection?: Song[], index?: number) {
     // Starting a new track/album resets history and clears user queue
     setPlayedHistory([]);
-    setUserQueue([]);
+    setUserQueueNext([]);
+    setUserQueueLast([]);
     setCurrentTrack(null);
 
     if (collection && collection.length > 0) {
@@ -271,11 +276,11 @@ function createAudioPlayer() {
       return;
     }
 
-    // 1. Check User Queue (Explicit Priority)
-    const uq = userQueue();
-    if (uq.length > 0) {
-      const nextSong = uq[0];
-      setUserQueue(uq.slice(1));
+    // 1. Check User Queue Next (plays before context resumes)
+    const uqNext = userQueueNext();
+    if (uqNext.length > 0) {
+      const nextSong = uqNext[0];
+      setUserQueueNext(uqNext.slice(1));
       startPlaybackStream(nextSong);
       return;
     }
@@ -289,12 +294,21 @@ function createAudioPlayer() {
       return;
     }
 
-    // 3. Reached end of Context
+    // 3. Check User Queue Last (plays after context finishes)
+    const uqLast = userQueueLast();
+    if (uqLast.length > 0) {
+      const nextSong = uqLast[0];
+      setUserQueueLast(uqLast.slice(1));
+      startPlaybackStream(nextSong);
+      return;
+    }
+
+    // 4. Reached end of everything
     if (repeatMode() === 'all' && cq.length > 0) {
       setContextIndex(0);
       startPlaybackStream(cq[0]);
     } else {
-      // Natural stop — no infinite loop!
+      // Natural stop
       setIsPlaying(false);
       audio.currentTime = 0;
       setCurrentTime(0);
@@ -341,7 +355,7 @@ function createAudioPlayer() {
       if (currTrack) {
         const currCqIdx = cq.findIndex((s) => s.id === currTrack.id);
         if (currCqIdx === -1) {
-          setUserQueue([currTrack, ...userQueue()]);
+          setUserQueueNext([currTrack, ...userQueueNext()]);
         }
       }
 
@@ -487,14 +501,17 @@ function createAudioPlayer() {
     }
 
     if (playNext) {
-      setUserQueue([...list, ...userQueue()]);
+      // Play Next: insert before the context queue resumes
+      setUserQueueNext([...list, ...userQueueNext()]);
     } else {
-      setUserQueue([...userQueue(), ...list]);
+      // Play Last: insert after the context queue finishes
+      setUserQueueLast([...userQueueLast(), ...list]);
     }
   }
 
   function removeFromUserQueue(songId: string) {
-    setUserQueue(userQueue().filter((s) => s.id !== songId));
+    setUserQueueNext(userQueueNext().filter((s) => s.id !== songId));
+    setUserQueueLast(userQueueLast().filter((s) => s.id !== songId));
     if (explicitSingleQueueIds().has(songId)) {
       const nextSet = new Set(explicitSingleQueueIds());
       nextSet.delete(songId);
@@ -503,15 +520,20 @@ function createAudioPlayer() {
   }
 
   function removeFromUserQueueByIndex(index: number) {
-    const uq = userQueue();
-    if (index >= 0 && index < uq.length) {
-      const s = uq[index];
-      removeFromUserQueue(s.id);
+    const uqNext = userQueueNext();
+    if (index < uqNext.length) {
+      removeFromUserQueue(uqNext[index].id);
+    } else {
+      const lastIndex = index - uqNext.length;
+      const uqLast = userQueueLast();
+      if (lastIndex >= 0 && lastIndex < uqLast.length) {
+        removeFromUserQueue(uqLast[lastIndex].id);
+      }
     }
   }
 
   function isSongInUserQueue(songId: string): boolean {
-    return userQueue().some((s) => s.id === songId);
+    return userQueueNext().some((s) => s.id === songId) || userQueueLast().some((s) => s.id === songId);
   }
 
   function isExplicitUserQueued(songId: string): boolean {
@@ -522,37 +544,39 @@ function createAudioPlayer() {
    * Clear ONLY the manual User Queue, keeping the active album/context completely intact.
    */
   function clearUserQueue() {
-    setUserQueue([]);
+    setUserQueueNext([]);
+    setUserQueueLast([]);
     setExplicitSingleQueueIds(new Set<string>());
     showToast('Queue Cleared');
   }
 
   function jumpToUserQueueIndex(index: number) {
-    const uq = userQueue();
-    if (index >= 0 && index < uq.length) {
-      const song = uq[index];
-      
+    const uqNext = userQueueNext();
+    if (index >= 0 && index < uqNext.length) {
+      const song = uqNext[index];
+
+      // Manually record history before jumping — pass skipHistoryRecording=true
+      // to startPlaybackStream so it doesn't push a second time.
       const newHistory = [...playedHistory()];
       const curr = currentTrack();
       if (curr) newHistory.push(curr);
-      
       for (let i = 0; i < index; i++) {
-        newHistory.push(uq[i]);
+        newHistory.push(uqNext[i]);
       }
       setPlayedHistory(newHistory);
-      
+
       const tracksToRemove = new Set<string>();
       for (let i = 0; i <= index; i++) {
-        tracksToRemove.add(uq[i].id);
+        tracksToRemove.add(uqNext[i].id);
       }
-      
-      setUserQueue(uq.slice(index + 1));
-      
+      setUserQueueNext(uqNext.slice(index + 1));
+
       const nextSet = new Set(explicitSingleQueueIds());
       tracksToRemove.forEach((id) => nextSet.delete(id));
       setExplicitSingleQueueIds(nextSet);
-      
-      startPlaybackStream(song);
+
+      // skipHistoryRecording=true — we already pushed above
+      startPlaybackStream(song, false, true);
     }
   }
 
@@ -560,7 +584,7 @@ function createAudioPlayer() {
     const cq = contextQueue();
     if (index >= 0 && index < cq.length) {
       const isRewind = index < contextIndex();
-      
+
       if (isRewind) {
         const history = playedHistory();
         const targetSong = cq[index];
@@ -569,24 +593,28 @@ function createAudioPlayer() {
           setPlayedHistory(history.slice(0, hIdx));
         }
       } else if (index > contextIndex()) {
+        // Manually push skipped songs into history
         const newHistory = [...playedHistory()];
         const curr = currentTrack();
         if (curr) newHistory.push(curr);
-        
-        const uq = userQueue();
-        uq.forEach(s => newHistory.push(s));
-        
+
+        const uqNext = userQueueNext();
+        uqNext.forEach(s => newHistory.push(s));
+
         for (let i = contextIndex() + 1; i < index; i++) {
           newHistory.push(cq[i]);
         }
         setPlayedHistory(newHistory);
-        
-        setUserQueue([]);
-        setExplicitSingleQueueIds(new Set<string>());
+
+        setUserQueueNext([]);
+        const nextSet = new Set(explicitSingleQueueIds());
+        uqNext.forEach(s => nextSet.delete(s.id));
+        setExplicitSingleQueueIds(nextSet);
       }
-      
+
       setContextIndex(index);
-      startPlaybackStream(cq[index], isRewind);
+      // skipHistoryRecording=true when jumping forward — we handled it above
+      startPlaybackStream(cq[index], isRewind, !isRewind);
     }
   }
 
@@ -596,13 +624,23 @@ function createAudioPlayer() {
   }
 
   function removeFromQueue(index: number, _silent = false) {
-    const uq = userQueue();
-    if (index < uq.length) {
+    const uqNext = userQueueNext();
+    const cq = contextQueue();
+    const cIdx = contextIndex();
+    const upcomingContextLen = Math.max(0, cq.length - 1 - cIdx);
+
+    if (index < uqNext.length) {
       removeFromUserQueueByIndex(index);
-    } else {
-      const contextOffset = index - uq.length;
-      const targetCtxIdx = contextIndex() + 1 + contextOffset;
+    } else if (index < uqNext.length + upcomingContextLen) {
+      const contextOffset = index - uqNext.length;
+      const targetCtxIdx = cIdx + 1 + contextOffset;
       removeFromContextQueueByIndex(targetCtxIdx);
+    } else {
+      const lastIndex = index - uqNext.length - upcomingContextLen;
+      const uqLast = userQueueLast();
+      if (lastIndex >= 0 && lastIndex < uqLast.length) {
+        removeFromUserQueue(uqLast[lastIndex].id);
+      }
     }
   }
 
@@ -611,7 +649,8 @@ function createAudioPlayer() {
   }
 
   function removeSongsFromQueue(songIds: Set<string>) {
-    setUserQueue(userQueue().filter((s) => !songIds.has(s.id)));
+    setUserQueueNext(userQueueNext().filter((s) => !songIds.has(s.id)));
+    setUserQueueLast(userQueueLast().filter((s) => !songIds.has(s.id)));
     const nextSet = new Set(explicitSingleQueueIds());
     songIds.forEach((id) => nextSet.delete(id));
     setExplicitSingleQueueIds(nextSet);
@@ -622,9 +661,12 @@ function createAudioPlayer() {
   }
 
   function clearQueue() {
-    clearUserQueue();
+    setUserQueueNext([]);
+    setUserQueueLast([]);
+    setExplicitSingleQueueIds(new Set<string>());
     const cIdx = contextIndex();
     setContextQueue(contextQueue().slice(0, cIdx + 1));
+    showToast('Queue Cleared');
   }
 
   function removeFromContextQueueByIndex(actualIdx: number) {
@@ -637,15 +679,45 @@ function createAudioPlayer() {
   }
 
   function jumpToQueueIndex(index: number) {
-    // If index is within userQueue
-    const uq = userQueue();
-    if (index < uq.length) {
+    const uqNext = userQueueNext();
+    const cq = contextQueue();
+    const cIdx = contextIndex();
+    const upcomingContextLen = Math.max(0, cq.length - 1 - cIdx);
+
+    if (index < uqNext.length) {
       jumpToUserQueueIndex(index);
-    } else {
-      // index is within contextQueue (offset by contextIndex + 1)
-      const contextOffset = index - uq.length;
-      const targetCtxIdx = contextIndex() + 1 + contextOffset;
+    } else if (index < uqNext.length + upcomingContextLen) {
+      const contextOffset = index - uqNext.length;
+      const targetCtxIdx = cIdx + 1 + contextOffset;
       jumpToContextIndex(targetCtxIdx);
+    } else {
+      // Clicking a userQueueLast item — treat like a user queue jump
+      const lastIndex = index - uqNext.length - upcomingContextLen;
+      const uqLast = userQueueLast();
+      if (lastIndex >= 0 && lastIndex < uqLast.length) {
+        const song = uqLast[lastIndex];
+
+        const newHistory = [...playedHistory()];
+        const curr = currentTrack();
+        if (curr) newHistory.push(curr);
+        uqNext.forEach(s => newHistory.push(s));
+        for (let i = cIdx + 1; i < cq.length; i++) newHistory.push(cq[i]);
+        for (let i = 0; i < lastIndex; i++) newHistory.push(uqLast[i]);
+        setPlayedHistory(newHistory);
+
+        setUserQueueNext([]);
+        setUserQueueLast(uqLast.slice(lastIndex + 1));
+        setContextIndex(cq.length);
+
+        const nextSet = new Set(explicitSingleQueueIds());
+        uqNext.forEach(s => nextSet.delete(s.id));
+        for (let i = 0; i <= lastIndex; i++) {
+          nextSet.delete(uqLast[i].id);
+        }
+        setExplicitSingleQueueIds(nextSet);
+
+        startPlaybackStream(song, false, true);
+      }
     }
   }
 
@@ -660,14 +732,15 @@ function createAudioPlayer() {
       const cq = contextQueue();
       const currTrack = currentTrack();
 
+      // Only re-queue tracks that aren't already in the context queue (i.e. manually queued ones)
       const customTracksToRequeue = tracksToRequeue.filter((s) => cq.findIndex((x) => x.id === s.id) === -1);
-      
+
       if (currTrack && cq.findIndex((s) => s.id === currTrack.id) === -1) {
         customTracksToRequeue.push(currTrack);
       }
 
       if (customTracksToRequeue.length > 0) {
-        setUserQueue([...customTracksToRequeue, ...userQueue()]);
+        setUserQueueNext([...customTracksToRequeue, ...userQueueNext()]);
       }
 
       const prevCqIdx = cq.findIndex((s) => s.id === song.id);
@@ -685,6 +758,7 @@ function createAudioPlayer() {
         setContextIndex(lastContextIdx);
       }
 
+      // isRewind=true so startPlaybackStream skips history recording
       startPlaybackStream(song, true);
     }
   }
@@ -696,7 +770,10 @@ function createAudioPlayer() {
     duration,
     contextQueue,
     contextIndex,
-    userQueue,
+    userQueueNext,
+    userQueueLast,
+    // Backwards-compatible: combined view of both manual queues
+    userQueue: () => [...userQueueNext(), ...userQueueLast()],
     playedHistory,
     isShuffle,
     repeatMode,

@@ -1,6 +1,8 @@
 import { Component, createMemo, createSignal, For, Show } from 'solid-js';
 import { audioPlayer } from '../../services/audio';
 import { api, Song } from '../../services/api';
+import { foldState } from '../../services/foldable';
+import { TabletopControlDeck } from './TabletopControlDeck';
 import {
   PlayIcon,
   PauseIcon,
@@ -37,6 +39,7 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
   const [dragTime, setDragTime] = createSignal<number | null>(null);
 
   let progressBarRef: HTMLDivElement | undefined;
+  let tabletopProgressBarRef: HTMLDivElement | undefined;
 
   const coverUrl = createMemo(() => {
     const t = track();
@@ -70,15 +73,16 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
     const nextState = !isStarred();
     setIsStarred(nextState);
     if (nextState) {
-      await api.starItem(t.id);
+      await api.star(t.id);
     } else {
-      await api.unstarItem(t.id);
+      await api.unstar(t.id);
     }
   };
 
-  function getTimeFromPointer(e: PointerEvent): number {
-    if (!progressBarRef) return 0;
-    const rect = progressBarRef.getBoundingClientRect();
+  function getTimeFromPointer(e: PointerEvent, targetRef?: HTMLDivElement): number {
+    const ref = targetRef || progressBarRef;
+    if (!ref) return 0;
+    const rect = ref.getBoundingClientRect();
     const dur = audioPlayer.duration();
     if (!dur || rect.width <= 0) return 0;
     const clickX = e.clientX - rect.left;
@@ -86,28 +90,30 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
     return ratio * dur;
   }
 
-  function handlePointerDown(e: PointerEvent) {
-    if (progressBarRef) {
-      progressBarRef.setPointerCapture(e.pointerId);
+  function handlePointerDown(e: PointerEvent, targetRef?: HTMLDivElement) {
+    const ref = targetRef || progressBarRef;
+    if (ref) {
+      ref.setPointerCapture(e.pointerId);
     }
     setIsDragging(true);
-    const targetTime = getTimeFromPointer(e);
+    const targetTime = getTimeFromPointer(e, targetRef);
     setDragTime(targetTime);
   }
 
-  function handlePointerMove(e: PointerEvent) {
+  function handlePointerMove(e: PointerEvent, targetRef?: HTMLDivElement) {
     if (isDragging()) {
-      const targetTime = getTimeFromPointer(e);
+      const targetTime = getTimeFromPointer(e, targetRef);
       setDragTime(targetTime);
     }
   }
 
-  function handlePointerUp(e: PointerEvent) {
+  function handlePointerUp(e: PointerEvent, targetRef?: HTMLDivElement) {
     if (isDragging()) {
-      if (progressBarRef && progressBarRef.hasPointerCapture(e.pointerId)) {
-        progressBarRef.releasePointerCapture(e.pointerId);
+      const ref = targetRef || progressBarRef;
+      if (ref && ref.hasPointerCapture(e.pointerId)) {
+        ref.releasePointerCapture(e.pointerId);
       }
-      const targetTime = getTimeFromPointer(e);
+      const targetTime = getTimeFromPointer(e, targetRef);
       audioPlayer.seek(targetTime);
       setIsDragging(false);
       setDragTime(null);
@@ -127,8 +133,13 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
   let scrollContainer: HTMLDivElement | undefined;
 
   const handleTouchStart = (e: TouchEvent) => {
-    // If we're scrolling inside the queue sheet, don't hijack swipe unless at the top
+    const target = e.target as HTMLElement | null;
+    if (target && target.closest('[data-queue-container="true"]')) {
+      startY = 0;
+      return;
+    }
     if (activeSheet() !== 'none' && scrollContainer && scrollContainer.scrollTop > 0) {
+      startY = 0;
       return;
     }
     startY = e.touches[0].clientY;
@@ -156,294 +167,354 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
   };
 
   const handleRemoveFromQueue = (idx: number) => {
-    if (idx === 0) return; // Cannot remove current track
-    const uqLen = audioPlayer.userQueue().length;
+    if (idx === 0) return;
     const offset = idx - 1;
-    if (offset < uqLen) {
-      audioPlayer.removeFromUserQueueByIndex(offset);
-    } else {
-      const contextOffset = offset - uqLen;
-      const targetCtxIdx = audioPlayer.contextIndex() + 1 + contextOffset;
-      audioPlayer.removeFromContextQueueByIndex(targetCtxIdx);
-    }
+    audioPlayer.removeFromQueue(offset);
   };
 
   return (
-    <div 
-      class="fixed inset-0 z-50 flex flex-col bg-[#121216] text-white overflow-hidden select-none animate-in fade-in slide-in-from-bottom duration-300"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* Background Dynamic Ambient Blur */}
-      <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-40">
-        <Show when={coverUrl()}>
-          <img
-            src={coverUrl()}
-            alt=""
-            class="w-full h-full object-cover filter blur-3xl scale-125 transform-gpu"
-          />
-        </Show>
-        <div class="absolute inset-0 bg-gradient-to-b from-black/40 via-black/70 to-[#0e0e12]" />
-      </div>
-
-      {/* Main Container */}
-      <div class="relative z-10 flex flex-col h-full w-full max-w-md mx-auto px-6 pt-[env(safe-area-inset-top,20px)] pb-[env(safe-area-inset-bottom,20px)] justify-between">
-        
-        {/* Top Dismiss Handle & Bar */}
-        <div class="flex items-center justify-between pt-3 pb-2">
-          <button
-            onClick={props.onClose}
-            class="w-10 h-10 -ml-2 rounded-full flex items-center justify-center text-neutral-400 hover:text-white active:scale-95 transition-transform"
-            aria-label="Collapse"
-          >
-            <ChevronDownIcon class="w-7 h-7" />
-          </button>
-
-          <div class="flex flex-col items-center">
-            <span class="text-[11px] font-bold uppercase tracking-widest text-neutral-400 mt-2">
-              {track()?.album || 'Now Playing'}
-            </span>
-          </div>
-
-          <div class="w-10 h-10 -mr-2 flex items-center justify-center">
-            {/* Context menu spacer */}
-          </div>
-        </div>
-
-        {/* Center: Album Artwork */}
-        <div class="flex-1 flex items-center justify-center py-4 min-h-0">
-          <div class={`relative aspect-square w-full max-w-[340px] max-h-[340px] rounded-3xl overflow-hidden shadow-2xl border border-white/10 transition-transform duration-500 ${isPlaying() ? 'scale-100' : 'scale-90 opacity-90'}`}>
-            <Show
-              when={coverUrl()}
-              fallback={
-                <div class="w-full h-full bg-neutral-800 flex items-center justify-center">
-                  <MusicNoteIcon class="w-24 h-24 text-neutral-600" />
-                </div>
-              }
-            >
+    <Show
+      when={foldState().isTabletop}
+      fallback={
+        /* Standard Mobile / Unfolded Dual-Pane View */
+        <div 
+          class="fixed inset-0 z-50 flex flex-col bg-gradient-to-br from-[#2a0815] via-[#111827] to-[#0c0a09] text-white overflow-hidden select-none animate-in fade-in slide-in-from-bottom duration-300"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Dynamic Full-Bleed Saturated Ambient Blurred Artwork Background */}
+          <div class="absolute inset-0 pointer-events-none overflow-hidden">
+            <Show when={coverUrl()}>
               <img
                 src={coverUrl()}
-                alt={track()?.title}
-                class="w-full h-full object-cover select-none"
+                alt=""
+                class="w-full h-full object-cover filter blur-3xl opacity-75 saturate-200 scale-150 transform-gpu"
               />
             </Show>
-          </div>
-        </div>
-
-        {/* Bottom Area: Controls */}
-        <div class="flex flex-col gap-6 pb-2">
-          
-          {/* Track Info */}
-          <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0 flex-1 flex flex-col">
-              <h2 class="text-xl md:text-2xl font-bold truncate tracking-tight">{track()?.title || 'No Track'}</h2>
-              <p class="text-base text-neutral-300 truncate opacity-80">{track()?.artist || 'Unknown Artist'}</p>
-            </div>
-            <button
-              onClick={handleToggleStar}
-              class={`w-10 h-10 shrink-0 flex items-center justify-center rounded-full transition-colors ${
-                isStarred() ? 'text-[#fa243c]' : 'text-neutral-400 hover:text-white'
-              }`}
-            >
-              <HeartIcon class="w-7 h-7" filled={isStarred()} />
-            </button>
+            <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/75" />
           </div>
 
-          {/* Timeline / Scrubber */}
-          <div class="flex flex-col gap-2">
-            <div
-              ref={progressBarRef}
-              class="relative h-6 flex items-center cursor-pointer touch-none group"
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerCancel}
-            >
-              <div class="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-white rounded-full transition-all duration-100 ease-linear"
-                  style={{ width: `${progressPercent()}%` }}
-                />
-              </div>
-              <div
-                class="absolute h-4 w-4 bg-white rounded-full shadow border border-black/10 scale-0 group-active:scale-100 transition-transform"
-                style={{ left: `calc(${progressPercent()}% - 8px)` }}
-              />
-            </div>
+          {/* Main Layout Container (Unfolded: Dual-Pane Side-by-Side) */}
+          <div class="relative z-10 flex flex-col md:flex-row h-full w-full px-4 md:px-6 pt-[env(safe-area-inset-top,20px)] pb-[env(safe-area-inset-bottom,20px)] justify-between md:gap-8 md:py-6">
             
-            <div class="flex items-center justify-between text-[11px] font-medium text-neutral-400 font-mono">
-              <span>{formatDuration(effectiveTime())}</span>
-              <span>{remainingTime()}</span>
-            </div>
-          </div>
-
-          {/* Transport Controls */}
-          <div class="flex items-center justify-between px-2">
-            <button
-              onClick={() => audioPlayer.toggleShuffle()}
-              class={`w-10 h-10 flex items-center justify-center active:scale-90 transition-transform ${
-                audioPlayer.isShuffle() ? 'text-[#fa243c]' : 'text-neutral-500 hover:text-white'
-              }`}
-              aria-label="Shuffle"
-            >
-              <ShuffleIcon class="w-6 h-6" />
-            </button>
-
-            <button
-              onClick={() => audioPlayer.previousTrack()}
-              class="w-12 h-12 flex items-center justify-center text-white active:scale-90 transition-transform"
-              aria-label="Previous Track"
-            >
-              <SkipPrevIcon class="w-9 h-9" />
-            </button>
-
-            <button
-              onClick={() => audioPlayer.togglePlay()}
-              class="w-18 h-18 bg-white text-black rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-transform"
-              aria-label={isPlaying() ? 'Pause' : 'Play'}
-            >
-              <Show when={isPlaying()} fallback={<PlayIcon class="w-9 h-9 ml-1" />}>
-                <PauseIcon class="w-9 h-9" />
-              </Show>
-            </button>
-
-            <button
-              onClick={() => audioPlayer.nextTrack()}
-              class="w-12 h-12 flex items-center justify-center text-white active:scale-90 transition-transform"
-              aria-label="Next Track"
-            >
-              <SkipNextIcon class="w-9 h-9" />
-            </button>
-
-            <button
-              onClick={() => audioPlayer.toggleRepeatMode()}
-              class={`w-10 h-10 flex items-center justify-center active:scale-90 transition-transform ${
-                audioPlayer.repeatMode() !== 'off' ? 'text-[#fa243c]' : 'text-neutral-500 hover:text-white'
-              }`}
-              aria-label="Repeat"
-            >
-              <Show when={audioPlayer.repeatMode() === 'one'} fallback={<RepeatIcon class="w-6 h-6" />}>
-                <RepeatOneIcon class="w-6 h-6" />
-              </Show>
-            </button>
-          </div>
-
-          {/* Bottom Utility Drawer Actions (Queue) */}
-          <div class="flex items-center justify-center pt-2 border-t border-white/10">
-            <button
-              onClick={() => setActiveSheet((s) => (s === 'queue' ? 'none' : 'queue'))}
-              class={`flex items-center gap-1.5 px-6 py-2.5 rounded-full text-xs font-bold transition-all ${
-                activeSheet() === 'queue'
-                  ? 'bg-white text-black shadow-md'
-                  : 'text-neutral-400 hover:text-white bg-white/5'
-              }`}
-            >
-              <QueueListIcon class="w-5 h-5" />
-              <span>Queue ({audioPlayer.upcomingCount()})</span>
-            </button>
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* Slide-over Queue Drawer */}
-      <Show when={activeSheet() === 'queue'}>
-        <div class="absolute inset-0 z-40 bg-[#14141a]/95 backdrop-blur-2xl flex flex-col px-6 pt-[env(safe-area-inset-top,24px)] pb-[env(safe-area-inset-bottom,24px)] animate-in slide-in-from-bottom duration-300">
-          <div class="flex items-center justify-between pb-4 border-b border-white/10">
-            <div>
-              <h2 class="text-xl font-bold text-white">Playing Next</h2>
-              <p class="text-xs text-neutral-400">{audioPlayer.upcomingCount()} songs in queue</p>
-            </div>
-            <button
-              onClick={() => setActiveSheet('none')}
-              class="px-4 py-1.5 bg-white/10 rounded-full text-sm font-bold text-white active:scale-95"
-            >
-              Done
-            </button>
-          </div>
-
-          <div class="flex-1 overflow-y-auto py-3 space-y-1 divide-y divide-white/5" ref={scrollContainer}>
-            <For each={audioPlayer.playedHistory()}>
-              {(song: Song) => (
-                <div
-                  onClick={() => audioPlayer.playHistoryItem(song)}
-                  class="flex items-center justify-between py-2.5 px-3 rounded-xl transition-colors opacity-50 hover:bg-white/5 text-neutral-300 cursor-pointer"
+            {/* LEFT PANE: Album Art, Info & Controls */}
+            <div class="w-full md:w-1/2 md:shrink-0 md:min-w-0 flex flex-col h-full max-w-md mx-auto md:max-w-none md:mx-0 justify-between">
+              {/* Top Dismiss Handle & Bar */}
+              <div class="flex items-center justify-between pt-2 pb-2 gap-3">
+                <button
+                  onClick={props.onClose}
+                  class="w-10 h-10 shrink-0 flex items-center justify-center text-neutral-300 hover:text-white active:scale-95 transition-all"
+                  aria-label="Collapse"
                 >
-                  <div class="flex items-center gap-3 min-w-0 flex-1">
-                    <div class="w-10 h-10 rounded-lg bg-neutral-800 overflow-hidden shrink-0 grayscale brightness-75">
-                      <img
-                        src={api.getSongCoverArtUrl(song, 120)}
-                        alt={song.title}
-                        class="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="text-sm font-semibold truncate leading-tight">{song.title}</p>
-                      <p class="text-xs text-neutral-400 truncate mt-0.5">{song.artist}</p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-3 shrink-0 ml-2">
-                    <span class="text-xs text-neutral-500 font-mono">
-                      {formatDuration(song.duration)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </For>
+                  <ChevronDownIcon class="w-6 h-6" />
+                </button>
 
-            <For each={audioPlayer.queue()}>
-              {(song: Song, idx) => {
-                const isCurrent = () => audioPlayer.currentTrack()?.id === song.id;
-                return (
-                  <div
-                    onClick={() => {
-                      if (!isCurrent()) audioPlayer.jumpToQueueIndex(idx() - 1);
-                    }}
-                    class={`flex items-center justify-between py-2.5 px-3 rounded-xl transition-colors ${
-                      isCurrent() ? 'bg-white/15 text-white font-bold' : 'hover:bg-white/5 text-neutral-300'
+                <div class="min-w-0 flex-1 flex flex-col items-center">
+                  <span class="text-[11px] font-bold uppercase tracking-widest text-white/70 mt-1 truncate w-full text-center">
+                    {track()?.album || 'Now Playing'}
+                  </span>
+                </div>
+
+                <div class="w-10 h-10 shrink-0 flex items-center justify-center">
+                  {/* Spacer */}
+                </div>
+              </div>
+
+              {/* Center: Album Artwork */}
+              <div class="flex-1 flex items-center justify-center py-4 min-h-0">
+                <div class={`relative aspect-square w-full max-w-[320px] max-h-[320px] md:max-w-[360px] md:max-h-[360px] rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/20 transition-transform duration-500 ${isPlaying() ? 'scale-100' : 'scale-90 opacity-90'}`}>
+                  <Show
+                    when={coverUrl()}
+                    fallback={
+                      <div class="w-full h-full bg-neutral-800 flex items-center justify-center">
+                        <MusicNoteIcon class="w-24 h-24 text-neutral-600" />
+                      </div>
+                    }
+                  >
+                    <img
+                      src={coverUrl()}
+                      alt={track()?.title}
+                      class="w-full h-full object-cover select-none"
+                    />
+                  </Show>
+                </div>
+              </div>
+
+              {/* Bottom Area: Controls */}
+              <div class="flex flex-col gap-5 pb-2">
+                
+                {/* Track Info */}
+                <div class="flex items-center justify-between gap-4">
+                  <div class="min-w-0 flex-1 flex flex-col">
+                    <h2 class="text-xl md:text-2xl font-bold truncate tracking-tight text-white drop-shadow">{track()?.title || 'No Track'}</h2>
+                    <p class="text-base text-neutral-300 truncate opacity-90 mt-0.5">{track()?.artist || 'Unknown Artist'}</p>
+                  </div>
+                  <button
+                    onClick={handleToggleStar}
+                    class={`w-10 h-10 shrink-0 flex items-center justify-center rounded-full transition-colors ${
+                      isStarred() ? 'text-[#fa243c]' : 'text-neutral-400 hover:text-white'
                     }`}
                   >
-                    <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <div class="w-10 h-10 rounded-lg bg-neutral-800 overflow-hidden shrink-0">
-                        <img
-                          src={api.getSongCoverArtUrl(song, 120)}
-                          alt={song.title}
-                          class="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <p class="text-sm font-semibold truncate leading-tight">{song.title}</p>
-                        <p class="text-xs text-neutral-400 truncate mt-0.5">{song.artist}</p>
-                      </div>
-                    </div>
+                    <HeartIcon class="w-7 h-7" filled={isStarred()} />
+                  </button>
+                </div>
 
-                    <div class="flex items-center gap-3 shrink-0 ml-2">
-                      <span class="text-xs text-neutral-500 font-mono">
-                        {formatDuration(song.duration)}
-                      </span>
-                      <Show when={!isCurrent()}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveFromQueue(idx());
-                          }}
-                          class="p-1.5 text-neutral-500 hover:text-red-400"
-                          title="Remove from queue"
-                        >
-                          <TrashIcon class="w-4 h-4" />
-                        </button>
-                      </Show>
+                {/* Timeline / Scrubber */}
+                <div class="flex flex-col gap-1.5">
+                  <div
+                    ref={progressBarRef}
+                    class="relative h-6 flex items-center cursor-pointer touch-none group"
+                    onPointerDown={(e) => handlePointerDown(e, progressBarRef)}
+                    onPointerMove={(e) => handlePointerMove(e, progressBarRef)}
+                    onPointerUp={(e) => handlePointerUp(e, progressBarRef)}
+                    onPointerCancel={handlePointerCancel}
+                  >
+                    <div class="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+                      <div
+                        class="h-full bg-[#fa243c] rounded-full transition-all duration-100 ease-linear"
+                        style={{ width: `${progressPercent()}%` }}
+                      />
                     </div>
+                    <div
+                      class="absolute h-4 w-4 bg-white rounded-full shadow border border-black/10 scale-100 group-active:scale-125 transition-transform"
+                      style={{ left: `calc(${progressPercent()}% - 8px)` }}
+                    />
                   </div>
-                );
-              }}
-            </For>
+                  
+                  <div class="flex items-center justify-between text-[11px] font-medium text-neutral-300 font-mono">
+                    <span>{formatDuration(effectiveTime())}</span>
+                    <span>{remainingTime()}</span>
+                  </div>
+                </div>
+
+                {/* Transport Controls */}
+                <div class="flex items-center justify-between px-2">
+                  <button
+                    onClick={() => audioPlayer.toggleShuffle()}
+                    class={`w-10 h-10 flex items-center justify-center active:scale-90 transition-transform ${
+                      audioPlayer.isShuffle() ? 'text-[#fa243c]' : 'text-neutral-400 hover:text-white'
+                    }`}
+                    aria-label="Shuffle"
+                  >
+                    <ShuffleIcon class="w-6 h-6" />
+                  </button>
+
+                  <button
+                    onClick={() => audioPlayer.previousTrack()}
+                    class="w-12 h-12 flex items-center justify-center text-white active:scale-90 transition-transform"
+                    aria-label="Previous Track"
+                  >
+                    <SkipPrevIcon class="w-9 h-9" />
+                  </button>
+
+                  <button
+                    onClick={() => audioPlayer.togglePlay()}
+                    class="w-16 h-16 bg-white text-black rounded-full flex items-center justify-center shadow-xl active:scale-90 transition-transform"
+                    aria-label={isPlaying() ? 'Pause' : 'Play'}
+                  >
+                    <Show when={isPlaying()} fallback={<PlayIcon class="w-8 h-8 ml-0.5" />}>
+                      <PauseIcon class="w-8 h-8" />
+                    </Show>
+                  </button>
+
+                  <button
+                    onClick={() => audioPlayer.nextTrack()}
+                    class="w-12 h-12 flex items-center justify-center text-white active:scale-90 transition-transform"
+                    aria-label="Next Track"
+                  >
+                    <SkipNextIcon class="w-9 h-9" />
+                  </button>
+
+                  <button
+                    onClick={() => audioPlayer.toggleRepeatMode()}
+                    class={`w-10 h-10 flex items-center justify-center active:scale-90 transition-transform ${
+                      audioPlayer.repeatMode() !== 'off' ? 'text-[#fa243c]' : 'text-neutral-400 hover:text-white'
+                    }`}
+                    aria-label="Repeat"
+                  >
+                    <Show when={audioPlayer.repeatMode() === 'one'} fallback={<RepeatIcon class="w-6 h-6" />}>
+                      <RepeatOneIcon class="w-6 h-6" />
+                    </Show>
+                  </button>
+                </div>
+
+                {/* Mobile Drawer Toggle (Hidden on wide unfolded view where queue is visible side-by-side) */}
+                <div class="flex items-center justify-center pt-2 md:hidden">
+                  <button
+                    onClick={() => setActiveSheet((s) => (s === 'queue' ? 'none' : 'queue'))}
+                    class={`flex items-center gap-1.5 px-6 py-2.5 rounded-full text-xs font-bold transition-all ${
+                      activeSheet() === 'queue'
+                        ? 'bg-white text-black shadow-md'
+                        : 'text-neutral-300 hover:text-white bg-white/10 border border-white/10 backdrop-blur-md'
+                    }`}
+                  >
+                    <QueueListIcon class="w-5 h-5" />
+                    <span>Queue ({audioPlayer.upcomingCount()})</span>
+                  </button>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* RIGHT PANE: Playing Next Queue Side-by-Side in Unfolded Mode OR Slide-over Drawer in Folded Mode */}
+            <div class={`w-full md:w-1/2 md:shrink-0 md:min-w-0 flex-col transition-all duration-300 ${
+              activeSheet() === 'queue' ? 'flex' : 'hidden md:flex'
+            } absolute inset-0 z-40 bg-black/80 backdrop-blur-3xl md:relative md:inset-auto md:z-auto md:bg-transparent md:backdrop-blur-none md:border-none md:rounded-none md:px-0 md:pr-6 md:h-full md:shadow-none overflow-hidden px-6 pt-[env(safe-area-inset-top,24px)] pb-[env(safe-area-inset-bottom,24px)] md:pt-16 md:pb-0`}>
+              
+              <div class="flex items-center justify-between pb-4 border-b border-white/10 shrink-0">
+                <div>
+                  <h2 class="text-xl font-bold text-white tracking-tight">Playing Next</h2>
+                  <p class="text-xs text-neutral-300">{audioPlayer.upcomingCount()} songs in queue</p>
+                </div>
+                <button
+                  onClick={() => setActiveSheet('none')}
+                  class="px-4 py-1.5 bg-white/15 hover:bg-white/25 rounded-full text-sm font-bold text-white active:scale-95 md:hidden"
+                >
+                  Done
+                </button>
+              </div>
+
+              <div class="flex-1 overflow-y-auto py-3 space-y-1 divide-y divide-white/5" ref={scrollContainer} data-queue-container="true">
+                <For each={audioPlayer.playedHistory()}>
+                  {(song: Song) => (
+                    <div
+                      onClick={() => audioPlayer.playHistoryItem(song)}
+                      class="flex items-center justify-between py-2.5 px-3 rounded-xl transition-colors opacity-50 hover:bg-white/5 text-neutral-300 cursor-pointer"
+                    >
+                      <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <div class="w-10 h-10 rounded-lg bg-neutral-800 overflow-hidden shrink-0 grayscale brightness-75">
+                          <img
+                            src={api.getSongCoverArtUrl(song, 120)}
+                            alt={song.title}
+                            class="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <p class="text-sm font-semibold truncate leading-tight">{song.title}</p>
+                          <p class="text-xs text-neutral-400 truncate mt-0.5">{song.artist}</p>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-3 shrink-0 ml-2">
+                        <span class="text-xs text-neutral-500 font-mono">
+                          {formatDuration(song.duration)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </For>
+
+                <For each={audioPlayer.queue()}>
+                  {(song: Song, idx) => {
+                    const isCurrent = () => audioPlayer.currentTrack()?.id === song.id;
+                    return (
+                      <div
+                        onClick={() => {
+                          if (!isCurrent()) audioPlayer.jumpToQueueIndex(idx() - 1);
+                        }}
+                        class={`flex items-center justify-between py-2.5 px-3 rounded-xl transition-colors ${
+                          isCurrent() ? 'bg-white/20 text-white font-bold' : 'hover:bg-white/5 text-neutral-200'
+                        }`}
+                      >
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                          <div class="w-10 h-10 rounded-lg bg-neutral-800 overflow-hidden shrink-0">
+                            <img
+                              src={api.getSongCoverArtUrl(song, 120)}
+                              alt={song.title}
+                              class="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold truncate leading-tight">{song.title}</p>
+                            <p class="text-xs text-neutral-300 truncate mt-0.5">{song.artist}</p>
+                          </div>
+                        </div>
+
+                        <div class="flex items-center gap-3 shrink-0 ml-2">
+                          <span class="text-xs text-neutral-400 font-mono">
+                            {formatDuration(song.duration)}
+                          </span>
+                          <Show when={!isCurrent()}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveFromQueue(idx());
+                              }}
+                              class="p-1.5 text-neutral-400 hover:text-red-400"
+                              title="Remove from queue"
+                            >
+                              <TrashIcon class="w-4 h-4" />
+                            </button>
+                          </Show>
+                        </div>
+                      </div>
+                    );
+                  }}
+                </For>
+              </div>
+            </div>
+
           </div>
         </div>
-      </Show>
+      }
+    >
+      {/* Tabletop Flex Mode View */}
+      <div class="fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-3xl text-white overflow-hidden select-none animate-in fade-in duration-300">
+        
+        {/* Full-Screen Dynamic Ambient Blur Background (Extends across both top & bottom panels) */}
+        <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-60">
+          <Show when={coverUrl()}>
+            <img
+              src={coverUrl()}
+              alt=""
+              class="w-full h-full object-cover filter blur-3xl scale-125 transform-gpu saturate-150"
+            />
+          </Show>
+          <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/85" />
+        </div>
 
-    </div>
+        {/* TOP HALF: Standing Screen (Gradient, Album Art + Track Info side by side) */}
+        <div class="relative z-10 w-full h-[50vh] flex flex-col justify-center p-6 overflow-hidden">
+
+          {/* Hero Content: Cover Art + Title/Artist Side-by-Side */}
+          <div class="flex items-center gap-6 my-auto px-4">
+            {/* Cover Art */}
+            <div class="w-44 h-44 sm:w-52 sm:h-52 md:w-56 md:h-56 rounded-3xl overflow-hidden shadow-2xl border border-white/20 shrink-0 bg-neutral-900">
+              <Show
+                when={coverUrl()}
+                fallback={
+                  <div class="w-full h-full bg-neutral-800 flex items-center justify-center">
+                    <MusicNoteIcon class="w-16 h-16 text-neutral-600" />
+                  </div>
+                }
+              >
+                <img src={coverUrl()} alt={track()?.title} class="w-full h-full object-cover" />
+              </Show>
+            </div>
+
+            {/* Title & Artist */}
+            <div class="flex flex-col min-w-0 flex-1 drop-shadow-md">
+              <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight leading-tight line-clamp-2">
+                {track()?.title || 'No Track Playing'}
+              </h1>
+              <p class="text-base md:text-lg font-semibold text-white/80 truncate mt-1">
+                {track()?.artist || 'Unknown Artist'}
+              </p>
+              <Show when={track()?.album}>
+                <p class="text-xs font-medium text-white/50 truncate mt-1">
+                  {track()?.album}
+                </p>
+              </Show>
+            </div>
+          </div>
+        </div>
+
+        {/* BOTTOM HALF: Tabletop Control Deck */}
+        <div class="relative z-10 w-full h-[50vh]">
+          <TabletopControlDeck onClose={props.onClose} />
+        </div>
+      </div>
+    </Show>
   );
 };

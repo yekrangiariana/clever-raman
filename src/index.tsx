@@ -1,6 +1,7 @@
 /* @refresh reload */
 import { render } from 'solid-js/web';
 import './index.css';
+import 'framework7-icons/css/framework7-icons.css';
 import App from './App';
 
 const root = document.getElementById('root');

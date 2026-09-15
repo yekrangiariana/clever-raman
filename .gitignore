@@ -9,3 +9,6 @@ src/config/devConfig.ts
 # OS Files
 .DS_Store
 *.log
+
+# Antigravity AI Instructions
+BUILD_GUIDE.md

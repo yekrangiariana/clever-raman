@@ -439,3 +439,46 @@ export const EllipsisIcon: Component<IconProps> = (props) => (
 );
 
 
+
+export const ShareIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/>
+  </svg>
+);
+
+/**
+ * Standard Album Disc / Collection Icon
+ */
+export const AlbumIcon: Component<IconProps> = (props) => (
+  <svg
+    class={props.class || "w-6 h-6"}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 3v3" />
+  </svg>
+);
+
+export const MinusCircleIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+export const ArrowDownTrayIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} fill="currentColor" viewBox="0 0 56 56">
+    <path d="M 12.1797 44.4648 C 10.9610 44.4648 10.1406 45.3320 10.1406 46.5508 C 10.1406 47.7695 10.9610 48.6602 12.1797 48.6602 L 43.7734 48.6602 C 45.0156 48.6602 45.8594 47.7695 45.8594 46.5508 C 45.8594 45.3320 45.0156 44.4648 43.7734 44.4648 L 28.4922 44.4648 C 28.8906 44.3477 29.2422 44.1367 29.5703 43.7852 L 45.0859 28.2695 C 45.5547 27.7773 45.7656 27.2617 45.7656 26.6992 C 45.7656 25.5273 44.9219 24.6367 43.7266 24.6367 C 43.1641 24.6367 42.6250 24.8476 42.2266 25.2227 L 36.9766 30.4024 L 29.9219 38.1133 L 30.1094 33.0976 L 30.1094 9.4258 C 30.1094 8.2071 29.2188 7.3398 28 7.3398 C 26.7812 7.3398 25.9141 8.2071 25.9141 9.4258 L 25.9141 33.0976 L 26.0781 38.1367 L 19.0234 30.4024 L 13.7734 25.2227 C 13.3984 24.8476 12.8359 24.6367 12.2734 24.6367 C 11.1016 24.6367 10.2344 25.5273 10.2344 26.6992 C 10.2344 27.2617 10.4688 27.7773 10.9375 28.2695 L 26.4297 43.7852 C 26.7578 44.1367 27.1328 44.3477 27.5312 44.4648 Z" />
+  </svg>
+);
+
+export const DragHandleIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} fill="currentColor" viewBox="0 0 56 56">
+    <path d="M 6.0626 19.5390 L 49.9144 19.5390 C 50.8984 19.5390 51.7187 18.7656 51.7187 17.7812 C 51.7187 16.7968 50.8984 16 49.9144 16 L 6.0626 16 C 5.0782 16 4.2813 16.7968 4.2813 17.7812 C 4.2813 18.7656 5.0782 19.5390 6.0626 19.5390 Z M 6.0626 29.7578 L 49.9144 29.7578 C 50.8984 29.7578 51.7187 28.9843 51.7187 28 C 51.7187 26.9921 50.8984 26.1953 49.9144 26.1953 L 6.0626 26.1953 C 5.0782 26.1953 4.2813 26.9921 4.2813 28 C 4.2813 28.9843 5.0782 29.7578 6.0626 29.7578 Z M 6.0626 40 L 49.9144 40 C 50.8984 40 51.7187 39.2031 51.7187 38.1953 C 51.7187 37.2109 50.8984 36.4375 49.9144 36.4375 L 6.0626 36.4375 C 5.0782 36.4375 4.2813 37.2109 4.2813 38.1953 C 4.2813 39.2031 5.0782 40 6.0626 40 Z" />
+  </svg>
+);

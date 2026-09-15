@@ -71,7 +71,22 @@ export const TrackRow: Component<TrackRowProps> = (props) => {
       </div>
 
       <div class="flex items-center gap-4 shrink-0 ml-4">
-        <button
+                <button
+          onClick={(e) => {
+            e.stopPropagation();
+            audioPlayer.addToUserQueue(props.song, true, true);
+          }}
+          class="p-2.5 rounded-full transition-colors flex items-center justify-center border shadow-md bg-neutral-800/90 border-neutral-700/80 text-neutral-400 hover:text-white hover:bg-neutral-700"
+          data-focusable="true"
+          data-section={`${props.section}_next`}
+          data-index={props.focusIndex}
+          title="Play Next"
+        >
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+          </svg>
+        </button>
+<button
           onClick={handleQueueClick}
           class={`p-2.5 rounded-full transition-colors flex items-center justify-center shadow-md ${
             isUserQueued()
@@ -83,7 +98,7 @@ export const TrackRow: Component<TrackRowProps> = (props) => {
           data-added={isUserQueued() ? "true" : undefined}
           data-section={`${props.section}_queue`}
           data-index={props.focusIndex}
-          title={isUserQueued() ? "In Queue (Click to Remove)" : "Add to Queue"}
+          title={isUserQueued() ? "In Queue (Click to Remove)" : "Play Last"}
         >
           {isUserQueued() ? <CheckIcon class="w-6 h-6 text-white" /> : <QueueAddIcon class="w-6 h-6" />}
         </button>

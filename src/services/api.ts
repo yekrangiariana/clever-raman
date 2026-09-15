@@ -45,6 +45,8 @@ export interface Playlist {
   id: string;
   name: string;
   comment?: string;
+  owner?: string;
+  public?: boolean;
   songCount: number;
   duration: number;
   created?: string;
@@ -406,8 +408,9 @@ class SubsonicApi {
    * Get all user playlists (getPlaylists.view)
    */
   public async getPlaylists(): Promise<Playlist[]> {
-    const res = await this.request<{ playlists?: { playlist?: Playlist[] } }>('getPlaylists.view');
-    return res.playlists?.playlist || [];
+    const res = await this.request<{ playlists?: { playlist?: Playlist | Playlist[] } }>('getPlaylists.view');
+    const pl = res.playlists?.playlist;
+    return pl ? (Array.isArray(pl) ? pl : [pl]) : [];
   }
 
   /**
@@ -418,10 +421,15 @@ class SubsonicApi {
       return this.playlistDetailsCache.get(id)!;
     }
 
-    const res = await this.request<{ playlist?: Playlist & { entry?: Song[] } }>('getPlaylist.view', { id });
+    const res = await this.request<{ playlist?: Playlist & { entry?: Song | Song[] } }>('getPlaylist.view', { id });
     const pl = res.playlist;
     if (!pl) throw new Error('Playlist not found');
-    const result = { playlist: pl, songs: pl.entry || [] };
+    
+    let songs: Song[] = [];
+    if (pl.entry) {
+      songs = Array.isArray(pl.entry) ? pl.entry : [pl.entry];
+    }
+    const result = { playlist: pl, songs };
 
     if (this.playlistDetailsCache.size >= 15) {
       const firstKey = this.playlistDetailsCache.keys().next().value;
@@ -459,15 +467,99 @@ class SubsonicApi {
    * Create a new Subsonic playlist (createPlaylist.view)
    */
   public async createPlaylist(name: string, songIds: string[]): Promise<boolean> {
-    if (!songIds || songIds.length === 0) return false;
     try {
       const params: Record<string, string | number> = { name: name.trim() };
-      // Pass songIds as multiple songId query params
-      const songQueryParams = songIds.map((id) => `songId=${encodeURIComponent(id)}`).join('&');
-      await this.request(`createPlaylist.view?${songQueryParams}`, params);
+      let queryParams = '';
+      if (songIds && songIds.length > 0) {
+        queryParams = songIds.map((id) => `songId=${encodeURIComponent(id)}`).join('&');
+      }
+      await this.request(`createPlaylist.view?${queryParams}`, params);
       return true;
     } catch (e) {
       console.error('Create playlist failed', e);
+      return false;
+    }
+  }
+
+  /**
+   * Test if a playlist is writable by sending a safe update request.
+   */
+  public async testPlaylistWritable(playlistId: string, currentName: string): Promise<boolean> {
+    try {
+      const params: Record<string, string | number> = { playlistId, name: currentName };
+      await this.request('updatePlaylist.view', params);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Update an existing Subsonic playlist (updatePlaylist.view)
+   */
+  public async updatePlaylist(playlistId: string, songIdsToAdd: string[]): Promise<boolean> {
+    if (!songIdsToAdd || songIdsToAdd.length === 0) return false;
+    try {
+      const params: Record<string, string | number> = { playlistId };
+      const songQueryParams = songIdsToAdd.map((id) => `songIdToAdd=${encodeURIComponent(id)}`).join('&');
+      await this.request(`updatePlaylist.view?${songQueryParams}`, params);
+      this.playlistDetailsCache.delete(playlistId);
+      return true;
+    } catch (e) {
+      console.error('Update playlist failed', e);
+      return false;
+    }
+  }
+
+  /**
+   * Remove songs from an existing Subsonic playlist (updatePlaylist.view)
+   */
+  public async removeFromPlaylist(playlistId: string, songIndexesToRemove: number[]): Promise<boolean> {
+    if (!songIndexesToRemove || songIndexesToRemove.length === 0) return false;
+    try {
+      const params: Record<string, string | number> = { playlistId };
+      const songQueryParams = songIndexesToRemove.map((idx) => `songIndexToRemove=${idx}`).join('&');
+      await this.request(`updatePlaylist.view?${songQueryParams}`, params);
+      this.playlistDetailsCache.delete(playlistId);
+      return true;
+    } catch (e) {
+      console.error('Remove from playlist failed', e);
+      return false;
+    }
+  }
+
+  /**
+   * Delete an existing Subsonic playlist (deletePlaylist.view)
+   */
+  public async deletePlaylist(id: string): Promise<boolean> {
+    try {
+      await this.request('deletePlaylist.view', { id });
+      this.playlistDetailsCache.delete(id);
+      return true;
+    } catch (e) {
+      console.error('Delete playlist failed', e);
+      return false;
+    }
+  }
+
+
+
+  /**
+   * Reorder a playlist by replacing all its tracks.
+   * Sends songIndexToRemove for all old songs, and songIdToAdd for the new order in a single request.
+   */
+  public async replacePlaylist(playlistId: string, oldSongCount: number, newSongIds: string[]): Promise<boolean> {
+    try {
+      const params: Record<string, string | number> = { playlistId };
+      const removeParams = Array.from({ length: oldSongCount }, (_, i) => `songIndexToRemove=${i}`).join('&');
+      const addParams = newSongIds.map(id => `songIdToAdd=${encodeURIComponent(id)}`).join('&');
+      const queryParams = [removeParams, addParams].filter(Boolean).join('&');
+      
+      await this.request(`updatePlaylist.view?${queryParams}`, params);
+      this.playlistDetailsCache.delete(playlistId);
+      return true;
+    } catch (e) {
+      console.error('Replace playlist failed', e);
       return false;
     }
   }
@@ -540,6 +632,15 @@ class SubsonicApi {
   }
 
   /**
+   * Get direct download URL for offline syncing (download.view?id=...)
+   */
+  public getDownloadUrl(id: string): string {
+    if (!this.config) return '';
+    const auth = this.getAuthParams();
+    return `${this.config.serverUrl}/rest/download.view?${auth}&id=${encodeURIComponent(id)}`;
+  }
+
+  /**
    * Get album cover art URL (getCoverArt.view?id=...&size=400)
    */
   public getCoverArtUrl(id?: string, size = 300): string {
@@ -555,6 +656,21 @@ class SubsonicApi {
     if (!song) return '';
     const coverId = song.coverArt || song.albumId || song.id;
     return this.getCoverArtUrl(coverId, size);
+  }
+
+  /**
+   * Custom local cover art for playlists (stored in localStorage)
+   */
+  public setCustomPlaylistCover(playlistId: string, base64Image: string) {
+    try {
+      localStorage.setItem(`custom_cover_pl_${playlistId}`, base64Image);
+    } catch (e) {
+      console.error('Failed to save custom cover (might be too large for localStorage)', e);
+    }
+  }
+
+  public getCustomPlaylistCover(playlistId: string): string | null {
+    return localStorage.getItem(`custom_cover_pl_${playlistId}`);
   }
 }
 

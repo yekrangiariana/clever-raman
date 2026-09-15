@@ -29,7 +29,7 @@ export const MobileMiniPlayer: Component<MobileMiniPlayerProps> = (props) => {
       <div class="px-3 pb-2 pt-1 w-full shrink-0 z-30 pointer-events-auto">
         <div 
           onClick={props.onOpenNowPlaying}
-          class="relative w-full h-14 bg-neutral-900/90 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center justify-between px-3 shadow-2xl overflow-hidden active:scale-[0.98] transition-transform cursor-pointer"
+          class="relative w-full h-14 bg-black/40 hover:bg-black/50 backdrop-blur-2xl border border-white/20 rounded-2xl flex items-center justify-between px-3 shadow-2xl overflow-hidden active:scale-[0.98] transition-all cursor-pointer"
         >
           {/* Subtle bottom progress bar */}
           <div 
@@ -39,7 +39,7 @@ export const MobileMiniPlayer: Component<MobileMiniPlayerProps> = (props) => {
 
           {/* Left: Album Artwork + Metadata */}
           <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
-            <div class="w-10 h-10 rounded-xl bg-neutral-800 overflow-hidden shrink-0 shadow-md flex items-center justify-center border border-white/5">
+            <div class="w-10 h-10 rounded-xl bg-neutral-800 overflow-hidden shrink-0 shadow-md flex items-center justify-center border border-white/10">
               <Show 
                 when={coverUrl()} 
                 fallback={<MusicNoteIcon class="w-5 h-5 text-neutral-500" />}
@@ -56,24 +56,24 @@ export const MobileMiniPlayer: Component<MobileMiniPlayerProps> = (props) => {
               <span class="text-sm font-bold text-white truncate leading-tight">
                 {track()?.title || 'Unknown Title'}
               </span>
-              <span class="text-xs font-medium text-neutral-400 truncate leading-tight mt-0.5">
+              <span class="text-xs font-medium text-neutral-300 truncate leading-tight mt-0.5">
                 {track()?.artist || 'Unknown Artist'}
               </span>
             </div>
           </div>
 
           {/* Right: Quick Touch Controls */}
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex items-center gap-1.5 shrink-0">
             <button
-              class="p-2 -mr-2 w-10 h-10 flex items-center justify-center text-white active:opacity-60 transition-opacity"
+              class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-white active:scale-95 transition-all shadow-sm"
               onClick={(e) => {
                 e.stopPropagation();
                 audioPlayer.togglePlay();
               }}
               aria-label={isPlaying() ? 'Pause' : 'Play'}
             >
-              <Show when={isPlaying()} fallback={<PlayIcon class="w-6 h-6 ml-0.5" />}>
-                <PauseIcon class="w-6 h-6" />
+              <Show when={isPlaying()} fallback={<PlayIcon class="w-5 h-5 ml-0.5" />}>
+                <PauseIcon class="w-5 h-5" />
               </Show>
             </button>
 
@@ -82,10 +82,10 @@ export const MobileMiniPlayer: Component<MobileMiniPlayerProps> = (props) => {
                 e.stopPropagation();
                 audioPlayer.nextTrack();
               }}
-              class="w-10 h-10 flex items-center justify-center text-neutral-300 hover:text-white active:opacity-60 transition-opacity"
+              class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-white active:scale-95 transition-all shadow-sm"
               aria-label="Next Track"
             >
-              <SkipNextIcon class="w-6 h-6" />
+              <SkipNextIcon class="w-5 h-5" />
             </button>
           </div>
         </div>

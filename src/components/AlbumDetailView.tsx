@@ -1,4 +1,4 @@
-import { Component, For, Show, createResource, createSignal, createMemo, createEffect, onCleanup } from 'solid-js';
+import { Component, For, Show, createResource, createSignal, createMemo, createEffect } from 'solid-js';
 import { APP_NAME } from "../config/constants";
 import { api, Song, Album, Playlist } from '../services/api';
 import { audioPlayer } from '../services/audio';
@@ -81,7 +81,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
           title: pl.playlist.name,
           subtitle: 'Subsonic Playlist',
           metadata: `${pl.songs.length} Tracks`,
-          coverArtUrl: props.customCoverVariant ? undefined : api.getCoverArtUrl(pl.playlist.coverArt || pl.playlist.id, 500),
+          coverArtUrl: props.customCoverVariant ? undefined : api.getCoverArtUrl(props.initialPlaylist?.coverArt || props.initialPlaylist?.id || pl.playlist.coverArt || pl.playlist.id, 500),
           coverVariant: props.customCoverVariant || undefined,
           songs: pl.songs,
           isPlaylist: true,
@@ -137,7 +137,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
           title: res.album.title,
           subtitle: res.album.artist,
           metadata: `${res.album.genre || 'Album'}${res.album.year ? ` • ${res.album.year}` : ''} • ${res.songs.length} Tracks`,
-          coverArtUrl: api.getCoverArtUrl(res.album.coverArt || albumId, 500),
+          coverArtUrl: api.getCoverArtUrl(props.initialAlbum?.coverArt || props.initialAlbum?.id || res.album.coverArt || albumId, 500),
           songs: res.songs,
           albumId,
         };
@@ -337,7 +337,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
             <p class="text-4xl font-bold text-neutral-300">{data().subtitle}</p>
             <p class="text-2xl font-semibold text-neutral-400">{data().metadata}</p>
 
-            {/* Action Buttons: Play, Shuffle, Add to Queue, Star */}
+            {/* Action Buttons: Play, Shuffle, Play Last, Star */}
             <div class="flex items-center gap-4 mt-4 py-4 pl-6 pr-4 -my-4 -ml-6 -mr-4 overflow-visible">
               <button
                 onClick={() => handlePlayCollection(data().songs || [], false)}
@@ -376,7 +376,7 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
                 data-added={isAlbumInQueue() ? "true" : undefined}
                 data-section="albumDetail"
                 data-index={indices().queueIdx}
-                title={isAlbumInQueue() ? "In Queue (Click to Remove)" : "Add to Queue"}
+                title={isAlbumInQueue() ? "In Queue (Click to Remove)" : "Play Last"}
               >
                 {isAlbumInQueue() ? <CheckIcon class="w-7 h-7 text-white" /> : <QueueAddIcon class="w-7 h-7" />}
               </button>

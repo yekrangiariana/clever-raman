@@ -399,12 +399,29 @@ function createFocusEngine() {
       const prevBtn = document.querySelector(`[data-section="${section}"][data-index="${index - 1}"]`);
       if (prevBtn) {
         setFocus(section as FocusSection, index - 1);
-      } else {
-        if (baseSection === 'albumDetail') {
+      } else if (!isHeart) {
+        // Left from Play Last (_queue) → try Play Next (_next) first
+        const nextSection = `${baseSection}_next` as FocusSection;
+        const nextBtn = document.querySelector(`[data-section="${nextSection}"][data-index="${index}"]`);
+        if (nextBtn) {
+          setFocus(nextSection, index);
+        } else if (baseSection === 'albumDetail') {
           setFocus('albumDetail', 1);
         } else {
           setFocus(baseSection as FocusSection, Math.max(0, index - 1));
         }
+      } else {
+        // Left from heart → go to _queue
+        const queueSection = section.replace('_heart', '_queue') as FocusSection;
+        setFocus(queueSection, index);
+      }
+    } else if (section.endsWith('_next')) {
+      // Left from Play Next button → back to the base row
+      const baseSection = section.replace('_next', '');
+      if (baseSection === 'albumDetail') {
+        setFocus('albumDetail', 1);
+      } else {
+        setFocus(baseSection as FocusSection, Math.max(0, index - 1));
       }
     } else if (section === 'setup') {
       if (index > 0) setFocus('setup', index - 1);
@@ -526,7 +543,7 @@ function createFocusEngine() {
       } else if (index < totalCount - 1) {
         setFocus('nowPlayingQueue', index + 1);
       }
-    } else if (section.endsWith('_queue') || section.endsWith('_heart')) {
+    } else if (section.endsWith('_queue') || section.endsWith('_heart') || section.endsWith('_next')) {
       const nextBtn = document.querySelector(`[data-section="${section}"][data-index="${index + 1}"]`);
       if (nextBtn) {
         setFocus(section as FocusSection, index + 1);
@@ -691,8 +708,11 @@ function createFocusEngine() {
     } else if (section === 'albumDetail') {
       const trackStartAttr = document.querySelector('[data-track-start]')?.getAttribute('data-track-start');
       const trackStart = trackStartAttr ? parseInt(trackStartAttr, 10) : 4;
+      const nextBtn = document.querySelector(`[data-section="albumDetail_next"][data-index="${index}"]`);
       const queueBtn = document.querySelector(`[data-section="albumDetail_queue"][data-index="${index}"]`);
-      if (queueBtn) {
+      if (nextBtn) {
+        setFocus('albumDetail_next' as FocusSection, index);
+      } else if (queueBtn) {
         setFocus('albumDetail_queue' as FocusSection, index);
       } else if (index < trackStart - 1) {
         setFocus('albumDetail', index + 1);
@@ -714,6 +734,13 @@ function createFocusEngine() {
       }
     } else if (section === 'nowPlayingQueue_remove') {
       // Reached the right edge
+    } else if (section.endsWith('_next')) {
+      // Right from Play Next button → Play Last button
+      const queueSection = section.replace('_next', '_queue') as FocusSection;
+      const queueBtn = document.querySelector(`[data-section="${queueSection}"][data-index="${index}"]`);
+      if (queueBtn) {
+        setFocus(queueSection, index);
+      }
     } else if (section.endsWith('_queue')) {
       const heartSection = section.replace('_queue', '_heart') as FocusSection;
       const heartBtn = document.querySelector(`[data-section="${heartSection}"][data-index="${index}"]`);

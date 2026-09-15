@@ -100,7 +100,8 @@ export const NowPlayingView: Component = () => {
     }
   }
 
-  const userQueue = () => audioPlayer.userQueue();
+  const userQueueNext = () => audioPlayer.userQueueNext();
+  const userQueueLast = () => audioPlayer.userQueueLast();
   const contextQueue = () => audioPlayer.contextQueue();
   const contextIndex = () => audioPlayer.contextIndex();
 
@@ -132,7 +133,7 @@ export const NowPlayingView: Component = () => {
     return Array.from(map.values());
   });
 
-  const hasClear = createMemo(() => userQueue().length > 0 || upcomingContext().length > 0);
+  const hasClear = createMemo(() => userQueueNext().length > 0 || userQueueLast().length > 0 || upcomingContext().length > 0);
 
   async function handleToggleStar() {
     const t = track();
@@ -455,13 +456,13 @@ export const NowPlayingView: Component = () => {
                 </div>
               </Show>
 
-              {/* 3. Manually Added User Queue Items */}
-              <For each={userQueue()}>
+              {/* 3. Manually Added User Queue Items (Play Next) */}
+              <For each={userQueueNext()}>
                 {(song, uqIndex) => {
                   return (
                     <div class="flex flex-col w-full [content-visibility:auto] [contain-intrinsic-size:0_6rem]">
                       <div
-                        onClick={() => audioPlayer.jumpToUserQueueIndex(uqIndex())}
+                        onClick={() => audioPlayer.jumpToQueueIndex(uqIndex())}
                         class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-transparent text-neutral-200 hover:bg-neutral-800/60"
                         data-focusable="true"
                         data-variant="list"
@@ -518,7 +519,7 @@ export const NowPlayingView: Component = () => {
               </For>
 
               {/* 4. Subtle Context Separator (Apple Music style) */}
-              <Show when={userQueue().length > 0 && upcomingContext().length > 0}>
+              <Show when={userQueueNext().length > 0 && upcomingContext().length > 0}>
                 <div class="flex items-center gap-4 my-3 px-3">
                   <div class="h-px bg-white/15 flex-1" />
                   <span class="text-xs font-bold tracking-wider text-neutral-400 uppercase">
@@ -540,7 +541,7 @@ export const NowPlayingView: Component = () => {
                         data-focusable="true"
                         data-variant="list"
                         data-section="nowPlayingQueue"
-                        data-index={pastContext().length + (track() ? 1 : 0) + userQueue().length + relIndex()}
+                        data-index={pastContext().length + (track() ? 1 : 0) + userQueueNext().length + relIndex()}
                       >
                         <div class="flex items-center gap-5 truncate flex-1 min-w-0">
                           <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
@@ -578,7 +579,84 @@ export const NowPlayingView: Component = () => {
                             data-focusable="true"
                             data-variant="topPick"
                             data-section="nowPlayingQueue_remove"
-                            data-index={pastContext().length + (track() ? 1 : 0) + userQueue().length + relIndex()}
+                            data-index={pastContext().length + (track() ? 1 : 0) + userQueueNext().length + relIndex()}
+                            title="Remove from Queue"
+                          >
+                            <CloseIcon class="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div class="w-full h-px bg-white/10 my-0.5" />
+                    </div>
+                  );
+                }}
+              </For>
+
+              {/* 6. Subtle Separator for Play Last */}
+              <Show when={(userQueueNext().length > 0 || upcomingContext().length > 0) && userQueueLast().length > 0}>
+                <div class="flex items-center gap-4 my-3 px-3">
+                  <div class="h-px bg-white/15 flex-1" />
+                  <span class="text-xs font-bold tracking-wider text-neutral-400 uppercase">
+                    Playing Last
+                  </span>
+                  <div class="h-px bg-white/15 flex-1" />
+                </div>
+              </Show>
+
+              {/* 7. Manually Added User Queue Items (Play Last) */}
+              <For each={userQueueLast()}>
+                {(song, uqlIndex) => {
+                  const globalQueueIdx = userQueueNext().length + upcomingContext().length + uqlIndex();
+                  const removeBtnIdx = userQueueNext().length + uqlIndex();
+                  const focusIdx = pastContext().length + (track() ? 1 : 0) + userQueueNext().length + upcomingContext().length + uqlIndex();
+                  
+                  return (
+                    <div class="flex flex-col w-full [content-visibility:auto] [contain-intrinsic-size:0_6rem]">
+                      <div
+                        onClick={() => audioPlayer.jumpToQueueIndex(globalQueueIdx)}
+                        class="h-24 px-5 rounded-2xl flex items-center justify-between cursor-pointer border border-transparent transition-all relative bg-transparent text-neutral-200 hover:bg-neutral-800/60"
+                        data-focusable="true"
+                        data-variant="list"
+                        data-section="nowPlayingQueue"
+                        data-index={focusIdx}
+                      >
+                        <div class="flex items-center gap-5 truncate flex-1 min-w-0">
+                          <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
+                            {song.coverArt || song.albumId || song.id ? (
+                              <img
+                                src={api.getSongCoverArtUrl(song, 300)}
+                                alt={song.title}
+                                class="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div class="w-full h-full flex items-center justify-center text-neutral-600">
+                                <MusicNoteIcon class="w-8 h-8" />
+                              </div>
+                            )}
+                          </div>
+
+                          <span class="font-mono text-xl font-black text-emerald-600 shrink-0">
+                            •
+                          </span>
+
+                          <div class="flex flex-col truncate min-w-0 flex-1">
+                            <span class="text-2xl font-extrabold truncate leading-snug">{song.title}</span>
+                            <span class="text-lg truncate font-medium text-neutral-400">{song.artist}</span>
+                          </div>
+                        </div>
+
+                        <div class="flex items-center gap-6 shrink-0 ml-4">
+                          <span class="font-mono text-xl font-medium text-neutral-400">
+                            {formatDuration(song.duration)}
+                          </span>
+                          <button
+                            onClick={(e) => handleRemoveUserQueueItem(removeBtnIdx, e)}
+                            class="p-2.5 rounded-full transition-all flex items-center justify-center border shadow-md bg-neutral-800/90 border-neutral-700/80 text-neutral-400 hover:text-white hover:bg-neutral-700 shrink-0"
+                            data-focusable="true"
+                            data-variant="topPick"
+                            data-section="nowPlayingQueue_remove"
+                            data-index={focusIdx}
                             title="Remove from Queue"
                           >
                             <CloseIcon class="w-5 h-5" />
@@ -592,7 +670,7 @@ export const NowPlayingView: Component = () => {
               </For>
 
               {/* Empty Queue State */}
-              <Show when={userQueue().length === 0 && upcomingContext().length === 0 && !track()}>
+              <Show when={userQueueNext().length === 0 && userQueueLast().length === 0 && upcomingContext().length === 0 && !track()}>
                 <div class="flex flex-col items-center justify-center py-16 text-neutral-500">
                   <p class="text-2xl font-bold">No upcoming tracks</p>
                 </div>

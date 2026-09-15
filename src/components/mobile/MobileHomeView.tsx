@@ -1,7 +1,11 @@
 import { Component, createResource, createMemo, For, Show } from 'solid-js';
 import { api, Album, Playlist, Song, Genre } from '../../services/api';
+import { createLongPress } from "../../hooks/useLongPress";
+import { setGlobalAlbumMenuTarget } from "../../services/uiState";
+import { activeDownloads, isAlbumDownloaded, downloadProgress } from "../../services/offlineSync";
+import { DownloadProgressRing } from '../common/DownloadProgressRing';
 import { TopPickCard } from '../common/TopPickCard';
-import { MusicNoteIcon, SparklesIcon } from '../common/Icons';
+import { MusicNoteIcon } from '../common/Icons';
 
 interface MobileHomeViewProps {
   onSelectAlbum: (album: Album) => void;
@@ -71,7 +75,6 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
       (p) => (p.songCount || 0) > 0 && isDailyRandomPlaylist(p.name)
     );
     const slot1 = {
-      categoryLabel: 'Daily Discovery',
       variant: 'station' as const,
       title: discoveryPlaylist ? discoveryPlaylist.name : 'Daily Random',
       subtitle: discoveryPlaylist ? `${discoveryPlaylist.songCount} Tracks` : 'Discovery Mix',
@@ -115,7 +118,6 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
 
     // Slot 3: Mesh Mix (Favorites or dynamic mix)
     const slot3 = {
-      categoryLabel: 'Made For You',
       variant: 'meshMix' as const,
       title: 'Favorites Mix',
       metadata: 'Your starred & most played songs in one dynamic mix',
@@ -159,7 +161,7 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
       <Show when={dailyTopPicks().length > 0}>
         <div>
           <div class="flex items-center gap-1.5 mb-3">
-            <h2 class="text-xl font-black text-white tracking-tight">Top Picks & Stations</h2>
+            <h2 class="text-xl font-black text-white tracking-tight">Top Picks</h2>
           </div>
 
           <div class="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none -mx-4 pl-4 scroll-pl-4 snap-x snap-mandatory after:content-[''] after:w-4 after:shrink-0">
@@ -184,79 +186,157 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
         </div>
       </Show>
 
-      {/* Favorite / Starred Albums Carousel */}
-      <Show when={homeData()?.starredAlbums && homeData()!.starredAlbums.length > 0}>
-        <div>
-          <h2 class="text-xl font-black text-white tracking-tight mb-3">
-            Favorites & Starred
-          </h2>
-          <div class="flex gap-3.5 overflow-x-auto pb-2 scrollbar-none -mx-4 pl-4 scroll-pl-4 snap-x after:content-[''] after:w-4 after:shrink-0">
+      {/* Favorites Carousel (Apple Music Style 'Heavy Rotation') */}
+      <Show when={homeData()?.starredAlbums && homeData()?.starredAlbums!.length > 0}>
+        <div class="w-full flex flex-col pt-2 pb-2">
+          <h2 class="text-xl font-black text-white mb-3 tracking-tight">Favorites</h2>
+          <div class="flex overflow-x-auto gap-4 pb-4 -mx-4 pl-4 scroll-pl-4 snap-x snap-mandatory scrollbar-none [-webkit-overflow-scrolling-touch] after:content-[''] after:w-4 after:shrink-0">
             <For each={homeData()?.starredAlbums}>
-              {(album) => (
-                <div
-                  onClick={() => props.onSelectAlbum(album)}
-                  class="w-36 sm:w-[clamp(9rem,20vw,14rem)] shrink-0 active:scale-95 transition-transform snap-start cursor-pointer"
-                >
-                  <div class="w-36 h-36 sm:w-full sm:h-auto sm:aspect-square rounded-2xl bg-neutral-800 overflow-hidden shadow-lg border border-white/5 mb-2">
-                    <img
-                      src={api.getCoverArtUrl(album.coverArt || album.id, 300)}
-                      alt={album.title || album.name}
-                      class="w-full h-full object-cover"
-                      loading="lazy"
-                    />
+              {(album) => {
+                const longPressHandlers = createLongPress(
+                  (e, targetElement) => {
+                    const rect = targetElement.getBoundingClientRect();
+                    setGlobalAlbumMenuTarget({ album, triggerRect: rect });
+                  },
+                  () => props.onSelectAlbum(album)
+                );
+                return (
+                  <div
+                    onTouchStart={longPressHandlers.onTouchStart}
+                    onTouchMove={longPressHandlers.onTouchMove}
+                    onTouchEnd={longPressHandlers.onTouchEnd}
+                    onTouchCancel={longPressHandlers.onTouchCancel}
+                    onMouseDown={longPressHandlers.onMouseDown}
+                    onMouseLeave={longPressHandlers.onMouseLeave}
+                    onMouseUp={longPressHandlers.onMouseUp}
+                    onClick={longPressHandlers.onClick}
+                    onContextMenu={longPressHandlers.onContextMenu}
+                    class="w-36 sm:w-[clamp(9rem,20vw,14rem)] shrink-0 active:scale-95 transition-transform snap-start cursor-pointer [-webkit-touch-callout:none]"
+                    data-context-target="true"
+                  >
+                    <div class="w-36 h-36 sm:w-full sm:h-auto sm:aspect-square rounded-2xl bg-neutral-800 overflow-hidden shadow-lg border border-white/5 mb-2 pointer-events-none relative">
+                      <img
+                        src={api.getCoverArtUrl(album.coverArt || album.id, 300)}
+                        alt={album.title || album.title}
+                        class="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      <Show when={activeDownloads().has(album.id) || isAlbumDownloaded(album.id)}>
+                        <div class="absolute bottom-2 right-2 flex items-center justify-center pointer-events-none">
+                          <Show when={activeDownloads().has(album.id)}>
+                            {/* Downloading spinner */}
+                            <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                              <DownloadProgressRing 
+                                progress={downloadProgress()[album.id] ? downloadProgress()[album.id].current / downloadProgress()[album.id].total : 0} 
+                                class="w-3.5 h-3.5 text-[#fa243c]" 
+                              />
+                            </div>
+                          </Show>
+                          <Show when={!activeDownloads().has(album.id) && isAlbumDownloaded(album.id)}>
+                            {/* Downloaded arrow */}
+                            <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                              <svg class="w-3 h-3 text-[#fa243c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                              </svg>
+                            </div>
+                          </Show>
+                        </div>
+                      </Show>
+                    </div>
+                    <p class="text-sm font-bold text-white truncate leading-tight pointer-events-none">
+                      {album.title || album.title}
+                    </p>
+                    <p class="text-xs font-medium text-neutral-400 truncate mt-0.5 pointer-events-none">
+                      {album.artist}
+                    </p>
                   </div>
-                  <p class="text-sm font-bold text-white truncate leading-tight">
-                    {album.title || album.name}
-                  </p>
-                  <p class="text-xs font-medium text-neutral-400 truncate mt-0.5">
-                    {album.artist}
-                  </p>
-                </div>
-              )}
+                );
+              }}
             </For>
           </div>
         </div>
       </Show>
 
-      {/* Recently Added (2-Column Grid) */}
-      <Show when={homeData()?.recentAlbums && homeData()!.recentAlbums.length > 0}>
-        <div>
-          <h2 class="text-xl font-black text-white tracking-tight mb-3">
-            Recently Added
-          </h2>
-
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+      {/* Recently Added Grid (Apple Music Style standard grid) */}
+      <Show when={homeData()?.recentAlbums && homeData()?.recentAlbums!.length > 0}>
+        <div class="w-full flex flex-col pt-2 pb-28">
+          <h2 class="text-xl font-black text-white mb-3 tracking-tight">Recently Added</h2>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <For each={homeData()?.recentAlbums}>
-              {(album) => (
-                <div
-                  onClick={() => props.onSelectAlbum(album)}
-                  class="flex flex-col active:scale-95 transition-transform cursor-pointer"
-                >
-                  <div class="aspect-square w-full rounded-2xl bg-neutral-800 overflow-hidden shadow-lg border border-white/5 mb-2">
-                    <Show
-                      when={album.coverArt || album.id}
-                      fallback={
-                        <div class="w-full h-full flex items-center justify-center bg-neutral-800">
-                          <MusicNoteIcon class="w-12 h-12 text-neutral-600" />
+              {(album) => {
+                const longPressHandlers = createLongPress(
+                  (e, targetElement) => {
+                    const rect = targetElement.getBoundingClientRect();
+                    setGlobalAlbumMenuTarget({ album, triggerRect: rect });
+                  },
+                  () => props.onSelectAlbum(album)
+                );
+                return (
+                  <div
+                    onTouchStart={longPressHandlers.onTouchStart}
+                    onTouchMove={longPressHandlers.onTouchMove}
+                    onTouchEnd={longPressHandlers.onTouchEnd}
+                    onTouchCancel={longPressHandlers.onTouchCancel}
+                    onMouseDown={longPressHandlers.onMouseDown}
+                    onMouseLeave={longPressHandlers.onMouseLeave}
+                    onMouseUp={longPressHandlers.onMouseUp}
+                    onClick={longPressHandlers.onClick}
+                    onContextMenu={longPressHandlers.onContextMenu}
+                    class="flex flex-col active:scale-95 transition-transform cursor-pointer [-webkit-touch-callout:none]"
+                    data-context-target="true"
+                  >
+                    <div class="aspect-square w-full rounded-2xl bg-neutral-800 overflow-hidden shadow-lg border border-white/5 mb-2 pointer-events-none relative">
+                      <Show
+                        when={album.coverArt || album.id}
+                        fallback={
+                          <div class="w-full h-full flex items-center justify-center bg-neutral-800">
+                            <MusicNoteIcon class="w-12 h-12 text-neutral-600" />
+                          </div>
+                        }
+                      >
+                        <img
+                          src={api.getCoverArtUrl(album.coverArt || album.id, 350)}
+                          alt={album.title || album.title}
+                          class="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </Show>
+                      <Show when={activeDownloads().has(album.id) || isAlbumDownloaded(album.id)}>
+                        <div class="absolute bottom-2 right-2 flex items-center justify-center pointer-events-none">
+                          <Show when={activeDownloads().has(album.id)}>
+                            {/* Downloading spinner */}
+                            <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                              <DownloadProgressRing 
+                                progress={downloadProgress()[album.id] ? downloadProgress()[album.id].current / downloadProgress()[album.id].total : 0} 
+                                class="w-3.5 h-3.5 text-[#fa243c]" 
+                              />
+                            </div>
+                          </Show>
+                          <Show when={!activeDownloads().has(album.id) && isAlbumDownloaded(album.id)}>
+                            {/* Downloaded arrow */}
+                            <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                              <svg class="w-3 h-3 text-[#fa243c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                              </svg>
+                            </div>
+                          </Show>
                         </div>
-                      }
-                    >
-                      <img
-                        src={api.getCoverArtUrl(album.coverArt || album.id, 350)}
-                        alt={album.title || album.name}
-                        class="w-full h-full object-cover"
-                        loading="lazy"
-                      />
+                      </Show>
+                    </div>
+                    <p class="text-sm font-bold text-white truncate leading-tight pointer-events-none">
+                      {album.title || album.title}
+                    </p>
+                    <p class="text-xs font-medium text-neutral-400 truncate mt-0.5 pointer-events-none">
+                      {album.artist}
+                    </p>
+                    <Show when={album.year}>
+                      <p class="text-[10px] text-neutral-500 font-medium pointer-events-none">
+                        {album.year}
+                      </p>
                     </Show>
                   </div>
-                  <p class="text-sm font-bold text-white truncate leading-tight">
-                    {album.title || album.name}
-                  </p>
-                  <p class="text-xs font-medium text-neutral-400 truncate mt-0.5">
-                    {album.artist}
-                  </p>
-                </div>
-              )}
+                );
+              }}
             </For>
           </div>
         </div>
