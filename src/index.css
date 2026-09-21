@@ -43,6 +43,12 @@
   z-index: 30;
 }
 
+/* TopPick cards have overflow-hidden for border-radius — override to visible on focus so box-shadow ring shows outside */
+[data-focusable="true"][data-variant="topPick"].focused {
+  overflow: visible !important;
+  border-radius: 1.5rem;
+}
+
 [data-focusable="true"]:not([data-variant="seekBar"]).pressed,
 [data-focusable="true"]:not([data-variant="seekBar"]):active {
   transform: none !important;
@@ -125,7 +131,8 @@
   transition: none !important;
 }
 
-/* Single-Song Queue Button Focus Styling (Enlarge + crisp focus ring) */
+/* Single-Song Action Buttons Focus Styling (Enlarge + crisp focus ring) */
+[data-focusable="true"][data-section$="_next"].focused,
 [data-focusable="true"][data-section$="_queue"]:not([data-added="true"]):not(.is-added).focused {
   background-color: #ffffff !important;
   color: #000000 !important;
@@ -135,6 +142,7 @@
   z-index: 30;
 }
 
+[data-focusable="true"][data-section$="_next"].focused *,
 [data-focusable="true"][data-section$="_queue"]:not([data-added="true"]):not(.is-added).focused * {
   color: #000000 !important;
   stroke: #000000 !important;
@@ -176,9 +184,16 @@ button.is-added * {
 
 /* Single-Song Heart Button Focus Styling (Enlarge + crisp focus ring) */
 [data-focusable="true"][data-section$="_heart"].focused {
+  background-color: #ffffff !important;
+  color: #e11d48 !important;
+  border-color: #ffffff !important;
   transform: scale3d(1.15, 1.15, 1) !important;
   box-shadow: 0 0 24px rgba(255, 255, 255, 0.9), 0 0 0 3.5px rgba(255, 255, 255, 1) !important;
   z-index: 30;
+}
+
+[data-focusable="true"][data-section$="_heart"].focused * {
+  color: #e11d48 !important;
 }
 
 /* Search Keyboard Key Focus (White button, black text/icons) */
@@ -291,4 +306,13 @@ button.is-added * {
 * {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@keyframes marquee-loop {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee-loop {
+  animation: marquee-loop 12s linear infinite;
 }

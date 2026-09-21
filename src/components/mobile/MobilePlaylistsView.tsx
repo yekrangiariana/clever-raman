@@ -1,4 +1,5 @@
 import { Component, createResource, createSignal, createMemo, For, Show } from 'solid-js';
+import { FadeImage } from '../common/FadeImage';
 import { api, Playlist } from '../../services/api';
 import { PlaylistsIcon, TrashIcon } from '../common/Icons';
 import { MobileAddToPlaylistSheet } from './MobileAddToPlaylistSheet';
@@ -6,8 +7,6 @@ import { AppleContextMenu, ContextMenuGroup } from './AppleContextMenu';
 import { AppleAlertDialog } from './AppleAlertDialog';
 import { createLongPress } from '../../hooks/useLongPress';
 import { audioPlayer } from '../../services/audio';
-import { downloadCollection, isAlbumDownloaded, removeCollection, activeDownloads, downloadProgress } from '../../services/offlineSync';
-import { DownloadProgressRing } from '../common/DownloadProgressRing';
 import { Capacitor } from '@capacitor/core';
 
 interface MobilePlaylistsViewProps {
@@ -28,7 +27,7 @@ export const MobilePlaylistsView: Component<MobilePlaylistsViewProps> = (props) 
       console.error('Failed to load playlists', e);
       return [];
     }
-  });
+  }, { initialValue: api.getCachedPlaylists() });
 
   const sortedPlaylists = createMemo(() => {
     const list = playlists() || [];
@@ -44,7 +43,7 @@ export const MobilePlaylistsView: Component<MobilePlaylistsViewProps> = (props) 
   return (
     <div class="w-full flex flex-col gap-4 pb-28 pt-2 px-4">
       {/* Sort label + add button row */}
-      <div class="flex items-center justify-between px-0.5">
+      <div class="flex items-center justify-between h-10 px-0.5">
         {/* Single sort label — Apple Music style */}
         {(() => {
           const [sortMenuRect, setSortMenuRect] = createSignal<DOMRect | null>(null);
@@ -58,8 +57,8 @@ export const MobilePlaylistsView: Component<MobilePlaylistsViewProps> = (props) 
                 }}
                 class="flex items-center gap-1 text-[#fa243c] active:opacity-50 transition-opacity"
               >
-                <span class="text-[13px] font-semibold">{sortLabel()}</span>
-                <svg class="w-3.5 h-3.5 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <span class="text-sm font-bold tracking-tight">Sort by {sortLabel()}</span>
+                <svg class="w-4 h-4 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                 </svg>
               </button>
@@ -81,7 +80,7 @@ export const MobilePlaylistsView: Component<MobilePlaylistsViewProps> = (props) 
         {/* Add playlist button */}
         <button
           onClick={() => setShowCreate(true)}
-          class="p-2 -mr-2 text-[#fa243c] active:scale-90 transition-transform"
+          class="p-2 -mr-2 text-[#fa243c] active:scale-90 transition-transform flex items-center justify-center"
         >
           <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
@@ -137,33 +136,11 @@ export const MobilePlaylistsView: Component<MobilePlaylistsViewProps> = (props) 
                       <PlaylistsIcon class="w-12 h-12 text-white/60" />
                     }
                   >
-                    <img
-                      src={api.getCustomPlaylistCover(pl.id) || coverUrl()}
+                    <FadeImage src={api.getCustomPlaylistCover(pl.id) || coverUrl()}
                       alt={pl.name}
-                      class="w-full h-full object-cover"
+                      class="w-full h-full "
                       loading="lazy"
                     />
-                  </Show>
-                  <Show when={activeDownloads().has(pl.id) || isAlbumDownloaded(pl.id)}>
-                    <div class="absolute bottom-2 right-2 flex items-center justify-center pointer-events-none">
-                      <Show when={activeDownloads().has(pl.id)}>
-                        {/* Downloading spinner */}
-                        <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                          <DownloadProgressRing 
-                            progress={downloadProgress()[pl.id] ? downloadProgress()[pl.id].current / downloadProgress()[pl.id].total : 0} 
-                            class="w-3.5 h-3.5 text-[#fa243c]" 
-                          />
-                        </div>
-                      </Show>
-                      <Show when={!activeDownloads().has(pl.id) && isAlbumDownloaded(pl.id)}>
-                        {/* Downloaded arrow */}
-                        <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                          <svg class="w-3 h-3 text-[#fa243c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                          </svg>
-                        </div>
-                      </Show>
-                    </div>
                   </Show>
                 </div>
 
@@ -235,34 +212,6 @@ export const MobilePlaylistsView: Component<MobilePlaylistsViewProps> = (props) 
               ]
             }
           ];
-
-          if (Capacitor.isNativePlatform()) {
-            g.push({
-              items: [
-                {
-                  label: isAlbumDownloaded(target.pl.id) ? 'Remove Download' : 'Download',
-                  destructive: isAlbumDownloaded(target.pl.id),
-                  icon: isAlbumDownloaded(target.pl.id) ? (
-                    <TrashIcon class="w-5 h-5 text-red-500" />
-                  ) : (
-                    <svg class="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                  ),
-                  onClick: async () => {
-                    const pl = target.pl;
-                    setMenuTargetPlaylist(null);
-                    if (isAlbumDownloaded(pl.id)) {
-                      removeCollection(pl.id);
-                    } else {
-                      const res = await api.getPlaylist(pl.id);
-                      downloadCollection(pl.id, res.songs, 'playlist', pl);
-                    }
-                  }
-                }
-              ]
-            });
-          }
 
           g.push({
             items: [

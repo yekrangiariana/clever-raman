@@ -26,6 +26,57 @@ export const ShuffleIcon: Component<IconProps> = (props) => (
 );
 
 /**
+ * Apple-style Play Next Icon (Queue list + Top insertion arrow)
+ */
+export const PlayNextIcon: Component<IconProps> = (props) => (
+  <svg
+    class={props.class || "w-6 h-6"}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M4 6h10M4 12h16M4 18h16M17 3v7M14 6l3-3 3 3" />
+  </svg>
+);
+
+/**
+ * Apple-style Play Last Icon (Queue list + End insertion arrow)
+ */
+export const PlayLastIcon: Component<IconProps> = (props) => (
+  <svg
+    class={props.class || "w-6 h-6"}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M4 6h16M4 12h16M4 18h10M17 14v7M14 18l3 3 3-3" />
+  </svg>
+);
+
+/**
+ * Pin Icon (Pushpin / Bookmark style)
+ */
+export const PinIcon: Component<IconProps> = (props) => (
+  <svg
+    class={props.class || "w-6 h-6"}
+    fill={props.filled ? "currentColor" : "none"}
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    stroke-width={props.filled ? "0" : "2"}
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6l1 1 1-1v-6H18v-2l-2-2z" />
+  </svg>
+);
+
+/**
  * Standard Add to Queue Icon (Playlist lines + plus badge)
  */
 export const QueueAddIcon: Component<IconProps> = (props) => (
@@ -482,3 +533,16 @@ export const DragHandleIcon: Component<IconProps> = (props) => (
     <path d="M 6.0626 19.5390 L 49.9144 19.5390 C 50.8984 19.5390 51.7187 18.7656 51.7187 17.7812 C 51.7187 16.7968 50.8984 16 49.9144 16 L 6.0626 16 C 5.0782 16 4.2813 16.7968 4.2813 17.7812 C 4.2813 18.7656 5.0782 19.5390 6.0626 19.5390 Z M 6.0626 29.7578 L 49.9144 29.7578 C 50.8984 29.7578 51.7187 28.9843 51.7187 28 C 51.7187 26.9921 50.8984 26.1953 49.9144 26.1953 L 6.0626 26.1953 C 5.0782 26.1953 4.2813 26.9921 4.2813 28 C 4.2813 28.9843 5.0782 29.7578 6.0626 29.7578 Z M 6.0626 40 L 49.9144 40 C 50.8984 40 51.7187 39.2031 51.7187 38.1953 C 51.7187 37.2109 50.8984 36.4375 49.9144 36.4375 L 6.0626 36.4375 C 5.0782 36.4375 4.2813 37.2109 4.2813 38.1953 C 4.2813 39.2031 5.0782 40 6.0626 40 Z" />
   </svg>
 );
+
+export const CloudIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17.5 19H9a7 7 0 1 1 6.71-9.9 5.5 5.5 0 0 1 1.8 10.8z"/>
+  </svg>
+);
+
+export const CloudOfflineIcon: Component<IconProps> = (props) => (
+  <svg class={props.class || "w-6 h-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3M1 1l22 22"/>
+  </svg>
+);
+

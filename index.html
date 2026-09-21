@@ -5,17 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>NaviOS</title>
     <link rel="icon" type="image/png" href="./icon.png" />
+    <link rel="preload" as="image" href="./large-splash.png" />
+    <link rel="preload" as="image" href="./logo.png" />
     <style>
       #app-splash {
         position: fixed;
         inset: 0;
         z-index: 99999;
         background-color: #000000;
-        background-image: url('/logo.png');
+        background-image: url('./logo.png');
         background-position: center;
         background-repeat: no-repeat;
         background-size: 120px 120px;
         transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+      }
+      @media (min-width: 768px) {
+        #app-splash {
+          background-image: url('./large-splash.png');
+          background-size: contain;
+          background-position: center;
+        }
       }
       #app-splash.fade-out {
         opacity: 0;

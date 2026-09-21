@@ -118,18 +118,8 @@ function createAudioPlayer() {
     } catch (e) {}
   }
 
-  function updateMediaSessionMetadata(track: Song) {
-    const coverUrl = api.getCoverArtUrl(track.coverArt || track.id, 800);
-    const metadata = {
-      title: track.title || 'Unknown Title',
-      artist: track.artist || 'Unknown Artist',
-      album: track.album || '',
-      artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/png' }] : [],
-    };
-
+  function setupMediaSessionActionHandlers() {
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata(metadata);
-
       navigator.mediaSession.setActionHandler('play', () => play());
       navigator.mediaSession.setActionHandler('pause', () => pause());
       navigator.mediaSession.setActionHandler('previoustrack', () => previousTrack());
@@ -144,7 +134,6 @@ function createAudioPlayer() {
     }
 
     try {
-      MediaSession.setMetadata(metadata).catch(() => {});
       MediaSession.setActionHandler({ action: 'play' }, () => play()).catch(() => {});
       MediaSession.setActionHandler({ action: 'pause' }, () => pause()).catch(() => {});
       MediaSession.setActionHandler({ action: 'previoustrack' }, () => previousTrack()).catch(() => {});
@@ -154,6 +143,26 @@ function createAudioPlayer() {
           seek(details.seekTime);
         }
       }).catch(() => {});
+    } catch (e) {}
+  }
+
+  setupMediaSessionActionHandlers();
+
+  function updateMediaSessionMetadata(track: Song) {
+    const coverUrl = api.getCoverArtUrl(track.coverArt || track.id, 300);
+    const metadata = {
+      title: track.title || 'Unknown Title',
+      artist: track.artist || 'Unknown Artist',
+      album: track.album || '',
+      artwork: coverUrl ? [{ src: coverUrl, sizes: '300x300', type: 'image/png' }] : [],
+    };
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata(metadata);
+    }
+
+    try {
+      MediaSession.setMetadata(metadata).catch(() => {});
     } catch (e) {}
   }
 
@@ -215,18 +224,28 @@ function createAudioPlayer() {
       recordHistory(prevTrack);
     }
     setCurrentTrack(track);
-    
-    // Defer network and audio pipeline initialization to let UI paint first
-    setTimeout(() => {
-      const streamUrl = api.getStreamUrl(track.id);
-      audio.src = streamUrl;
-      audio.play().catch((err) => {
-        if (err.name !== 'AbortError') {
-          console.error('Failed to start audio playback', err);
+
+    const streamUrl = api.getStreamUrl(track.id);
+    audio.src = streamUrl;
+    audio.play().catch((err) => {
+      if (err.name !== 'AbortError') {
+        console.error('Failed to start audio playback', err);
+        // Fallback to transcoding (mp3) if the browser doesn't support the native codec (e.g. ALAC on Firefox)
+        if (
+          err.name === 'NotSupportedError' || 
+          err.message.includes('not suitable') || 
+          err.message.includes('decode') ||
+          (err.code && err.code === 9) // 9 is DOMException.NOT_SUPPORTED_ERR
+        ) {
+          console.log(`Codec not supported, falling back to mp3 for track: ${track.id}`);
+          audio.src = api.getStreamUrl(track.id, 'mp3');
+          audio.play().catch((e) => {
+            if (e.name !== 'AbortError') console.error('Transcode fallback also failed', e);
+          });
         }
-      });
-      updateMediaSessionMetadata(track);
-    }, 50);
+      }
+    });
+    updateMediaSessionMetadata(track);
   }
 
   /**

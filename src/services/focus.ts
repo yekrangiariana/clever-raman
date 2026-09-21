@@ -66,6 +66,10 @@ function createFocusEngine() {
       if (section === 'topBar') {
         scrollParent = document.querySelector('.overflow-y-auto') || document.querySelector('main');
         if (scrollParent) pendingScrollTopReset = true;
+      } else if (section === 'albumFilters') {
+        // Filter bar is always at the top — scroll to top when focused, never to bottom
+        scrollParent = document.querySelector('.overflow-y-auto') || document.querySelector('main');
+        if (scrollParent) pendingScrollTopReset = true;
       } else if (section === 'search_kbd' || section === 'search_mode') {
         // Fixed stage
       } else if (section === 'search_tabs') {
@@ -291,7 +295,7 @@ function createFocusEngine() {
 
   function getHomeRowRanges(): { start: number; count: number }[] {
     const now = performance.now();
-    if (cachedHomeRowRanges && now - lastHomeRowComputeTime < 1500) {
+    if (cachedHomeRowRanges && now - lastHomeRowComputeTime < 8000) {
       return cachedHomeRowRanges;
     }
 
@@ -948,6 +952,10 @@ function createFocusEngine() {
     });
   }
 
+  function invalidateHomeRowCache() {
+    cachedHomeRowRanges = null;
+  }
+
   return {
     currentLocation,
     activeTab,
@@ -969,6 +977,7 @@ function createFocusEngine() {
     syncDOMFocus,
     exitApp,
     cancelExit,
+    invalidateHomeRowCache,
   };
 }
 

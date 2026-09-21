@@ -1,11 +1,12 @@
 import { Component, createResource, createMemo, For, Show } from 'solid-js';
+import { FadeImage } from '../common/FadeImage';
 import { api, Album, Playlist, Song, Genre } from '../../services/api';
 import { createLongPress } from "../../hooks/useLongPress";
 import { setGlobalAlbumMenuTarget } from "../../services/uiState";
-import { activeDownloads, isAlbumDownloaded, downloadProgress } from "../../services/offlineSync";
-import { DownloadProgressRing } from '../common/DownloadProgressRing';
 import { TopPickCard } from '../common/TopPickCard';
 import { MusicNoteIcon } from '../common/Icons';
+import { pinnedPlaylistIds } from '../../services/pinnedPlaylists';
+import { getScopedKey } from '../../services/profiles';
 
 interface MobileHomeViewProps {
   onSelectAlbum: (album: Album) => void;
@@ -36,6 +37,11 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
       if (randomRes.status === 'fulfilled') randomAlbums = randomRes.value;
       if (playlistsRes.status === 'fulfilled') playlists = playlistsRes.value;
       if (genresRes.status === 'fulfilled') genres = genresRes.value;
+      
+      // Explicitly capture network failures from the main query
+      if (newestRes.status === 'rejected') {
+        fetchError = newestRes.reason?.message || 'Network request failed';
+      }
     } catch (e: any) {
       console.warn('Home fetch error', e);
       fetchError = e.message || String(e);
@@ -49,6 +55,15 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
       genres,
       fetchError,
     };
+  }, {
+    initialValue: {
+      recentAlbums: api.getCachedAlbumList('newest', 20),
+      starredAlbums: api.getCachedAlbumList('starred', 10),
+      randomAlbums: api.getCachedAlbumList('random', 20),
+      playlists: api.getCachedPlaylists(),
+      genres: api.getCachedGenres(),
+      fetchError: ''
+    }
   });
 
   // Dynamic daily Top Picks generated exactly like TV HomeView
@@ -91,18 +106,22 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
 
     // Slot 2: Album of the Day
     const todayStr = now.toDateString();
-    let savedAlbumStr = localStorage.getItem('navios_daily_album');
-    let savedAlbumDate = localStorage.getItem('navios_daily_album_date');
+    const albumKey = getScopedKey('navios_daily_album');
+    const dateKey = getScopedKey('navios_daily_album_date');
+    let savedAlbumStr = localStorage.getItem(albumKey);
+    let savedAlbumDate = localStorage.getItem(dateKey);
     let randomAlbum: any = null;
     
     if (savedAlbumDate === todayStr && savedAlbumStr) {
       try { randomAlbum = JSON.parse(savedAlbumStr); } catch(e) {}
     }
     
-    if (!randomAlbum && data.randomAlbums && data.randomAlbums.length > 0) {
-      randomAlbum = data.randomAlbums[0];
-      localStorage.setItem('navios_daily_album', JSON.stringify(randomAlbum));
-      localStorage.setItem('navios_daily_album_date', todayStr);
+    if (!randomAlbum && data.recentAlbums && data.recentAlbums.length > 0) {
+      // Pick a random recent album as album of the day
+      const randIdx = Math.floor(Math.random() * data.recentAlbums.length);
+      randomAlbum = data.recentAlbums[randIdx];
+      localStorage.setItem(albumKey, JSON.stringify(randomAlbum));
+      localStorage.setItem(dateKey, todayStr);
     }
 
     const slot2 = randomAlbum
@@ -111,7 +130,7 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
           variant: 'album' as const,
           title: randomAlbum.title,
           subtitle: randomAlbum.artist || 'Unknown Artist',
-          coverArtUrl: api.getCoverArtUrl(randomAlbum.coverArt || randomAlbum.id, 400),
+          coverArtUrl: api.getCoverArtUrl(randomAlbum.coverArt || randomAlbum.id, 500),
           onClick: () => props.onSelectAlbum(randomAlbum),
         }
       : null;
@@ -135,24 +154,37 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
       onClick: () => props.onSelectMix(chosenGenre, 'genreMix'),
     };
 
-    return [slot1, slot2, slot3, slot4].filter(Boolean) as NonNullable<typeof slot1>[];
+    type TopPickItem = {
+      variant: 'album' | 'station' | 'playlist' | 'meshMix' | 'genreMix';
+      title: string;
+      subtitle?: string;
+      metadata?: string;
+      categoryLabel?: string;
+      coverArtUrl?: string;
+      onClick: () => void;
+    };
+
+    return [slot1, slot2, slot3, slot4].filter(Boolean) as TopPickItem[];
+  });
+
+  const pinnedPlaylists = createMemo(() => {
+    const allPl = homeData()?.playlists || [];
+    const pinned = pinnedPlaylistIds();
+    return pinned
+      .map((id) => allPl.find((p) => p.id === id))
+      .filter(Boolean) as Playlist[];
   });
 
   return (
     <div class="w-full flex flex-col gap-6 pb-28 pt-3 px-4">
       
-      {/* Error / Connection Notice if fetch failed */}
-      <Show when={homeData()?.fetchError && homeData()?.recentAlbums.length === 0}>
+      {/* Connection Notice if fetch failed AND we have no cache */}
+      <Show when={!homeData()?.recentAlbums?.length && homeData()?.fetchError}>
         <div class="p-4 rounded-2xl bg-red-950/80 border border-red-800/80 text-red-200 flex flex-col gap-2">
           <p class="text-xs font-bold">Could not connect to Navidrome server</p>
           <p class="text-[11px] font-mono text-red-300">{homeData()?.fetchError}</p>
           <div class="flex gap-2 mt-1">
-            <button
-              onClick={() => refetch()}
-              class="px-3 py-1 bg-red-800 text-white rounded-lg text-xs font-bold active:scale-95"
-            >
-              Retry
-            </button>
+            <button onClick={() => refetch()} class="px-3 py-1 bg-red-800 text-white rounded-lg text-xs font-bold active:scale-95">Retry</button>
           </div>
         </div>
       </Show>
@@ -215,33 +247,11 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
                     data-context-target="true"
                   >
                     <div class="w-36 h-36 sm:w-full sm:h-auto sm:aspect-square rounded-2xl bg-neutral-800 overflow-hidden shadow-lg border border-white/5 mb-2 pointer-events-none relative">
-                      <img
-                        src={api.getCoverArtUrl(album.coverArt || album.id, 300)}
+                      <FadeImage src={api.getCoverArtUrl(album.coverArt || album.id, 500)}
                         alt={album.title || album.title}
-                        class="w-full h-full object-cover"
+                        class="w-full h-full "
                         loading="lazy"
                       />
-                      <Show when={activeDownloads().has(album.id) || isAlbumDownloaded(album.id)}>
-                        <div class="absolute bottom-2 right-2 flex items-center justify-center pointer-events-none">
-                          <Show when={activeDownloads().has(album.id)}>
-                            {/* Downloading spinner */}
-                            <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                              <DownloadProgressRing 
-                                progress={downloadProgress()[album.id] ? downloadProgress()[album.id].current / downloadProgress()[album.id].total : 0} 
-                                class="w-3.5 h-3.5 text-[#fa243c]" 
-                              />
-                            </div>
-                          </Show>
-                          <Show when={!activeDownloads().has(album.id) && isAlbumDownloaded(album.id)}>
-                            {/* Downloaded arrow */}
-                            <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                              <svg class="w-3 h-3 text-[#fa243c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                              </svg>
-                            </div>
-                          </Show>
-                        </div>
-                      </Show>
                     </div>
                     <p class="text-sm font-bold text-white truncate leading-tight pointer-events-none">
                       {album.title || album.title}
@@ -252,6 +262,38 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
                   </div>
                 );
               }}
+            </For>
+          </div>
+        </div>
+      </Show>
+
+      {/* Pinned Playlists Carousel (after Favorites) */}
+      <Show when={pinnedPlaylists().length > 0}>
+        <div class="w-full flex flex-col pt-2 pb-2">
+          <h2 class="text-xl font-black text-white mb-3 tracking-tight">Pinned Playlists</h2>
+          <div class="flex overflow-x-auto gap-4 pb-4 -mx-4 pl-4 scroll-pl-4 snap-x snap-mandatory scrollbar-none [-webkit-overflow-scrolling-touch] after:content-[''] after:w-4 after:shrink-0">
+            <For each={pinnedPlaylists()}>
+              {(pl) => (
+                <div
+                  onClick={() => props.onSelectPlaylist?.(pl)}
+                  class="w-36 sm:w-[clamp(9rem,20vw,14rem)] shrink-0 active:scale-95 transition-transform snap-start cursor-pointer [-webkit-touch-callout:none]"
+                >
+                  <div class="w-36 h-36 sm:w-full sm:h-auto sm:aspect-square rounded-2xl bg-neutral-800 overflow-hidden shadow-lg border border-white/5 mb-2 pointer-events-none relative flex items-center justify-center">
+                    <FadeImage
+                      src={api.getCustomPlaylistCover(pl.id) || api.getCoverArtUrl(pl.coverArt || pl.id, 300)}
+                      alt={pl.name}
+                      class="w-full h-full"
+                      loading="lazy"
+                    />
+                  </div>
+                  <p class="text-sm font-bold text-white truncate leading-tight pointer-events-none">
+                    {pl.name}
+                  </p>
+                  <p class="text-xs font-medium text-neutral-400 truncate mt-0.5 pointer-events-none">
+                    {pl.songCount || 0} tracks
+                  </p>
+                </div>
+              )}
             </For>
           </div>
         </div>
@@ -294,33 +336,11 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
                           </div>
                         }
                       >
-                        <img
-                          src={api.getCoverArtUrl(album.coverArt || album.id, 350)}
+                        <FadeImage src={api.getCoverArtUrl(album.coverArt || album.id, 500)}
                           alt={album.title || album.title}
-                          class="w-full h-full object-cover"
+                          class="w-full h-full "
                           loading="lazy"
                         />
-                      </Show>
-                      <Show when={activeDownloads().has(album.id) || isAlbumDownloaded(album.id)}>
-                        <div class="absolute bottom-2 right-2 flex items-center justify-center pointer-events-none">
-                          <Show when={activeDownloads().has(album.id)}>
-                            {/* Downloading spinner */}
-                            <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                              <DownloadProgressRing 
-                                progress={downloadProgress()[album.id] ? downloadProgress()[album.id].current / downloadProgress()[album.id].total : 0} 
-                                class="w-3.5 h-3.5 text-[#fa243c]" 
-                              />
-                            </div>
-                          </Show>
-                          <Show when={!activeDownloads().has(album.id) && isAlbumDownloaded(album.id)}>
-                            {/* Downloaded arrow */}
-                            <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                              <svg class="w-3 h-3 text-[#fa243c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                              </svg>
-                            </div>
-                          </Show>
-                        </div>
                       </Show>
                     </div>
                     <p class="text-sm font-bold text-white truncate leading-tight pointer-events-none">

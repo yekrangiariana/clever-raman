@@ -6,7 +6,8 @@ import { AlbumCard } from './common/AlbumCard';
 import { TrackCard } from './common/TrackCard';
 import { TopPickCard } from './common/TopPickCard';
 import { SectionHeader } from './common/SectionHeader';
-import { sessionVersionSignal } from '../services/profiles';
+import { sessionVersionSignal, getScopedKey } from '../services/profiles';
+import { pinnedPlaylistIds } from '../services/pinnedPlaylists';
 
 interface HomeViewProps {
   onSelectAlbum: (album: Album) => void;
@@ -146,6 +147,8 @@ export const HomeView: Component<HomeViewProps> = (props) => {
         data.newest.length + 
         data.random.length;
       focusEngine.setSectionLength('grid', total);
+      // Invalidate row cache so DPad navigation picks up the new carousel layout
+      focusEngine.invalidateHomeRowCache();
     }
   });
 
@@ -194,8 +197,10 @@ export const HomeView: Component<HomeViewProps> = (props) => {
 
     // Slot 2: Album of the Day (Stable per day via localStorage)
     const todayStr = now.toDateString();
-    let savedAlbumStr = localStorage.getItem('navios_daily_album');
-    let savedAlbumDate = localStorage.getItem('navios_daily_album_date');
+    const albumKey = getScopedKey('navios_daily_album');
+    const dateKey = getScopedKey('navios_daily_album_date');
+    let savedAlbumStr = localStorage.getItem(albumKey);
+    let savedAlbumDate = localStorage.getItem(dateKey);
     let randomAlbum: any = null;
     
     if (savedAlbumDate === todayStr && savedAlbumStr) {
@@ -204,8 +209,8 @@ export const HomeView: Component<HomeViewProps> = (props) => {
     
     if (!randomAlbum && data.random && data.random.length > 0) {
       randomAlbum = data.random[0];
-      localStorage.setItem('navios_daily_album', JSON.stringify(randomAlbum));
-      localStorage.setItem('navios_daily_album_date', todayStr);
+      localStorage.setItem(albumKey, JSON.stringify(randomAlbum));
+      localStorage.setItem(dateKey, todayStr);
     }
 
     const slot2 = randomAlbum
@@ -295,8 +300,20 @@ export const HomeView: Component<HomeViewProps> = (props) => {
     return picks;
   });
 
-  // Contiguous focus index across sections: TopPicks (4) -> Starred Albums (20) -> Starred Tracks (20) -> Newest (20) -> Random (20)
-  const getIndex = (sectionType: 'topPicks' | 'starred' | 'starredTracks' | 'newest' | 'random', itemIdx: number) => {
+  const pinnedPlaylists = createMemo(() => {
+    const allPl = homeData()?.playlists || [];
+    // Read pinned IDs — this memo only runs when homeData OR pinnedPlaylistIds changes
+    const pinned = pinnedPlaylistIds();
+    return pinned
+      .map((id) => allPl.find((p) => p.id === id))
+      .filter(Boolean) as Playlist[];
+  });
+
+  // Stable count accessor — avoids re-subscribing getIndex callers to pinnedPlaylistIds
+  const pinnedCount = createMemo(() => pinnedPlaylists().length);
+
+  // Contiguous focus index across sections: TopPicks -> Starred Albums -> Starred Tracks -> Pinned Playlists -> Newest -> Random
+  const getIndex = (sectionType: 'topPicks' | 'starred' | 'starredTracks' | 'pinnedPlaylists' | 'newest' | 'random', itemIdx: number) => {
     const data = homeData();
     if (!data) return itemIdx;
 
@@ -310,6 +327,9 @@ export const HomeView: Component<HomeViewProps> = (props) => {
     if (sectionType === 'starredTracks') return base + itemIdx;
 
     base += (data.starredTracks?.length || 0);
+    if (sectionType === 'pinnedPlaylists') return base + itemIdx;
+
+    base += pinnedCount();
     if (sectionType === 'newest') return base + itemIdx;
 
     base += data.newest.length;
@@ -390,6 +410,30 @@ export const HomeView: Component<HomeViewProps> = (props) => {
                         section="grid"
                         focusIndex={getIndex('starredTracks', index())}
                         onPlay={(s) => audioPlayer.playTrack(s, [s], 0)}
+                      />
+                    </div>
+                  )}
+                </For>
+              </div>
+            </section>
+          )}
+
+          {/* Carousel Section 3.5: Pinned Playlists (5 visible per view) */}
+          {pinnedPlaylists().length > 0 && (
+            <section class="flex flex-col">
+              <SectionHeader title="Pinned Playlists" />
+              <div class="flex flex-row gap-6 overflow-x-auto [::-webkit-scrollbar]:hidden py-8 px-8 -mx-4 -my-4 [scroll-padding:36px]">
+                <For each={pinnedPlaylists()}>
+                  {(pl, index) => (
+                    <div class="w-[calc((100%-4.5rem)/4.35)] shrink-0 min-w-[19.5rem]">
+                      <TopPickCard
+                        title={pl.name}
+                        subtitle={`${pl.songCount || 0} tracks`}
+                        variant="playlist"
+                        coverArtUrl={api.getCustomPlaylistCover(pl.id) || api.getCoverArtUrl(pl.coverArt || pl.id, 300)}
+                        section="grid"
+                        index={getIndex('pinnedPlaylists', index())}
+                        onClick={() => props.onSelectPlaylist?.(pl)}
                       />
                     </div>
                   )}

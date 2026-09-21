@@ -21,7 +21,7 @@ interface MainGridProps {
 }
 
 const albumCache = new Map<string, Album[]>();
-let globalCurrentFilter: AlbumSortFilter = 'alphabeticalByName';
+let globalCurrentFilter: AlbumSortFilter = 'newest';
 
 export function clearAlbumCache() {
   albumCache.clear();

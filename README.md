@@ -1,190 +1,200 @@
-# 🎵 NaviOS for webOS
+# 🎵 NaviOS
 
-An elegant, fast, Apple TV-inspired webOS app designed specifically for smart TVs connected to a [Navidrome](https://www.navidrome.org/) music server.
+An Apple TV-inspired music client built for [Navidrome](https://www.navidrome.org/) (Subsonic API), designed to bring an elegant, responsive listening experience to both the living room and mobile devices.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![webOS](https://img.shields.io/badge/platform-LG%20webOS-red.svg)
+![webOS](https://img.shields.io/badge/platform-LG%20webOS%20(.ipk)-red.svg)
+![Android](https://img.shields.io/badge/platform-Android%20(.apk)-3DDC84.svg?logo=android&logoColor=white)
 ![SolidJS](https://img.shields.io/badge/framework-SolidJS-4d87cd.svg)
+![TailwindCSS](https://img.shields.io/badge/styling-Tailwind%20v4-38bdf8.svg)
+
+> [!NOTE]
+> **Online-Only Client**: NaviOS streams directly from your personal Navidrome / Subsonic server. There is **no offline playback or local caching of music files** available. Both the webOS and Android builds require an active network connection to your server.
+
+---
+
+## 📌 About the Project
+
+NaviOS is a personal, open-source hobby project created to solve a simple itch: enjoying a self-hosted Navidrome music library on an LG Smart TV with a clean remote-friendly interface, while also having an equally fluid client on Android phones, tablets, and foldable devices. 
+
+It is free software under the MIT license, built purely for utility and the self-hosting community—no ads, no analytics, no commercial intentions.
 
 ---
 
 ## ✨ Features
 
-- **Apple TV Aesthetics**: Clean, modern dark mode UI designed for 1080p and 4K TV displays.
-- **D-Pad Native Focus Engine**: Flawless navigation using your standard TV remote control (directional buttons, Back, Select).
-- **Daily Dynamic Top Picks**: Home screen features dynamic genre mixes and smart playlists that automatically rotate every 24 hours.
-- **Smart Playlist (.nsp) Integration**: Full native support for Navidrome Smart Playlists.
-- **Blazingly Fast Performance**: Off-thread image decoding (`decoding="async"`), client-side caching, and zero main-thread jank.
-- **Inline Settings**: Easily manage server URL and credentials without clunky modals.
+### 🖥️ Dual-Interface Architecture (Adaptive Shell)
+A single SolidJS codebase that automatically detects device context at launch:
+- **TV Shell (`TVShell`)**: Tailored for TV remotes and 1080p/4K screens. Powered by a custom spatial D-pad focus engine, instant navigation without sluggish transition jank, and an Apple TV-inspired dark aesthetic.
+- **Mobile Shell (`MobileShell`)**: Optimized for touchscreens, featuring an iOS/Apple Music-inspired mini-player, slide-over queue drawers, context action sheets, and pull-down dismissals.
+- **Foldable & Tablet Aware**: Native tabletop posture detection (`androidx.window` on Android). When bent half-opened on a desk, controls smoothly adapt into a dedicated tabletop control deck.
+
+### 🎶 Playback & Queue Management
+- **Hierarchical 3-Tier Queue**:
+  1. *User Queue Next* (songs inserted explicitly to play next)
+  2. *Context Queue* (the active album or playlist playing passively)
+  3. *User Queue Last* (tracks appended to play after the current context ends)
+- **Played History & Rewind**: Dedicated history tracking allowing you to step back through recently played tracks without losing your active playlist position.
+- **Scrubbing & Precise Seeking**: Smooth timeline seeking with time preview badges and quick skip intervals.
+- **Playback Modes**: Full shuffle and repeat modes (`Off`, `All`, `One`).
+- **Media Session Integration**: Background playback with lock screen and notification controls on Android via Capacitor Media Session, plus standard browser media session support on webOS.
+
+### 👥 Multi-User Profiles
+- Store multiple accounts/credentials on the same device.
+- Instant switching between profiles with custom gradient avatars.
+- Optional boot profile selector for shared living-room TVs.
+- Independent favorites, pinned playlists, and listening contexts per profile.
+
+### 🔍 Discovery & Browsing
+- **Daily Top Picks**: Rotates dynamic genre mixes, "Album of the Day", and time-of-context playlists (Morning, Afternoon, Evening, Late Night) every 24 hours.
+- **Dynamic Mixes**: Instantly generate dynamic multi-album genre mixes directly from the home screen.
+- **On-Screen Search**: Quick search across artists, albums, and tracks, complete with a remote-friendly on-screen keyboard for TV remotes.
+- **Playlist Management**: Browse server playlists, pin favorites to the top, and edit tracklists directly.
 
 ---
 
-## ⚡ Smart Playlists & Daily Top Picks
+## ⚡ Smart Playlists (`.nsp`)
 
-NaviOS takes full advantage of Navidrome's **Smart Playlist (`.nsp`)** feature to automatically surface relevant music in your **Top Picks** section every single day.
+Navidrome supports **Smart Playlists**—lightweight JSON files saved with an `.nsp` extension in your music folder that dynamically generate track selections based on rules (e.g., play count, rating, release year, or genre).
 
-### What are Smart Playlists?
-Smart Playlists are dynamic, rule-based JSON files stored on your Navidrome server as `.nsp` files. Rather than containing static song lists, they dynamically query your library based on criteria like:
-- **Forgotten Gems**: High-rated songs you haven't played in over 90 days.
-- **Top Rated Favorites**: 4 and 5-star tracks across all genres.
-- **Decade Hits**: 60s, 70s, 80s, 90s, 2000s, 2010s, and Modern Essentials.
-- **Unplayed Graveyard**: Tracks sitting in your library that you haven't played yet.
+NaviOS integrates directly with smart playlists to surface dynamic recommendations on the home screen.
 
----
+### Example Rules
 
-### 🛠️ Setting Up Smart Playlists (2 Quick Methods)
+To create a smart playlist, create a `.nsp` file inside your Navidrome music library (for example, `/music/Playlists/ForgottenGems.nsp`):
 
-Choose either method below to deploy smart playlists to your Navidrome server:
-
-#### Method 1: Instant Script (Deploys 20 Essential Smart Playlists in 5 Seconds)
-SSH into your server and run this single command (replace `/path/to/music` with your Navidrome music folder, e.g., `/home/user/Music`):
-
-```bash
-mkdir -p /path/to/music/Playlists
-
-cat << 'EOF' > /path/to/music/Playlists/ForgottenGems.nsp
-{"name":"Forgotten Gems","comment":"Top rated tracks not played in 90 days","all":[{"gt":{"rating":3}},{"notInTheLast":{"lastPlayed":90}}],"sort":"lastPlayed","order":"asc","limit":35}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/TopRatedFavorites.nsp
-{"name":"Top Rated Favorites","comment":"4 & 5-star rated tracks","all":[{"gt":{"rating":3}}],"sort":"rating","order":"desc","limit":50}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/RecentlyAdded.nsp
-{"name":"Recently Added","comment":"Songs added in the last 30 days","all":[{"inTheLast":{"dateAdded":30}}],"sort":"dateAdded","order":"desc","limit":50}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/UnplayedGraveyard.nsp
-{"name":"Unplayed Graveyard","comment":"Tracks sitting in your library you haven't played yet","all":[{"is":{"playCount":0}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/MostPlayedHits.nsp
-{"name":"Most Played Hits","comment":"Your most frequently played tracks","all":[{"gt":{"playCount":2}}],"sort":"playCount","order":"desc","limit":50}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/StarredFavorites.nsp
-{"name":"Starred Favorites","comment":"Tracks you have starred/liked","all":[{"is":{"starred":true}}],"sort":"title","order":"asc","limit":50}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/60sClassics.nsp
-{"name":"60s Classics","comment":"Tracks released between 1960 and 1969","all":[{"inTheRange":{"year":[1960,1969]}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/70sHits.nsp
-{"name":"70s Hits","comment":"Classic tracks from the 1970s","all":[{"inTheRange":{"year":[1970,1979]}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/80sPopSynth.nsp
-{"name":"80s Synth & Pop","comment":"Favorite tracks from the 1980s","all":[{"inTheRange":{"year":[1980,1989]}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/90sHits.nsp
-{"name":"90s Hits","comment":"Classic alternative & pop from the 1990s","all":[{"inTheRange":{"year":[1990,1999]}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/2000sEssentials.nsp
-{"name":"2000s Essentials","comment":"Best tracks from the 2000s","all":[{"inTheRange":{"year":[2000,2009]}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/2010sHits.nsp
-{"name":"2010s Hits","comment":"Hits from 2010 to 2019","all":[{"inTheRange":{"year":[2010,2019]}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/ModernReleases.nsp
-{"name":"Modern Releases","comment":"Recent music released from 2020 onwards","all":[{"gt":{"year":2019}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/ShortAndSweet.nsp
-{"name":"Short & Sweet","comment":"Quick tracks under 3 minutes long","all":[{"lt":{"duration":181}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/ExtendedEpics.nsp
-{"name":"Extended Epics","comment":"Long tracks over 6 minutes","all":[{"gt":{"duration":359}}],"sort":"duration","order":"desc","limit":30}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/AcousticAndChill.nsp
-{"name":"Acoustic & Chill","comment":"Mellow and acoustic tracks","any":[{"contains":{"genre":"Acoustic"}},{"contains":{"genre":"Folk"}},{"contains":{"genre":"Chill"}},{"contains":{"genre":"Ambient"}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/RockAndEnergy.nsp
-{"name":"Rock & High Energy","comment":"Rock, Metal, and high energy beats","any":[{"contains":{"genre":"Rock"}},{"contains":{"genre":"Metal"}},{"contains":{"genre":"Punk"}},{"contains":{"genre":"Alternative"}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/JazzAndBlues.nsp
-{"name":"Jazz & Blues Lounge","comment":"Smooth jazz and classic blues","any":[{"contains":{"genre":"Jazz"}},{"contains":{"genre":"Blues"}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/HipHopAndRnB.nsp
-{"name":"Hip-Hop & R&B","comment":"Hip-Hop, Rap, and Soul tracks","any":[{"contains":{"genre":"Hip-Hop"}},{"contains":{"genre":"Rap"}},{"contains":{"genre":"R&B"}},{"contains":{"genre":"Soul"}}],"sort":"random","limit":40}
-EOF
-
-cat << 'EOF' > /path/to/music/Playlists/DailyRandomDiscovery.nsp
-{"name":"Daily Random Discovery","comment":"A random mix of 40 tracks from your library","all":[{"gt":{"year":0}}],"sort":"random","limit":40}
-EOF
-
-echo "Done! Created 20 Smart Playlists in /path/to/music/Playlists"
+**Forgotten Gems** (tracks rated 4+ stars not played in the last 90 days):
+```json
+{
+  "name": "Forgotten Gems",
+  "comment": "Top rated tracks not played in 90 days",
+  "all": [
+    { "gt": { "rating": 3 } },
+    { "notInTheLast": { "lastPlayed": 90 } }
+  ],
+  "sort": "lastPlayed",
+  "order": "asc",
+  "limit": 35
+}
 ```
 
-#### Method 2: Interactive CLI Generator (Custom Playlists)
-Alternatively, use the interactive generator by **WB2024**:
-```bash
-git clone https://github.com/WB2024/Navidrome-SmartPlaylist-Generator-nsp.git
-cd Navidrome-SmartPlaylist-Generator-nsp
-pip3 install rich
-python3 navidrome_smart_playlist_creator.py
+**Top Rated Favorites** (4 and 5-star tracks):
+```json
+{
+  "name": "Top Rated Favorites",
+  "comment": "High-rated library favorites",
+  "all": [
+    { "gt": { "rating": 3 } }
+  ],
+  "sort": "rating",
+  "order": "desc",
+  "limit": 50
+}
 ```
 
----
+### Loading into Navidrome
+1. Save your `.nsp` files in your library's playlist directory.
+2. Trigger a scan in Navidrome (**Settings** $\rightarrow$ **Activity / Library** $\rightarrow$ **Quick Scan**).
+3. The playlists will appear in NaviOS and automatically populate your daily rotation.
 
-### 🔍 Verifying & Scanning
-
-1. **Verify Files on Server**:
-   ```bash
-   ls -1 /path/to/music/Playlists/*.nsp | wc -l
-   # Should output: 20
-   ```
-
-2. **Trigger Navidrome Scan**:
-   - Open Navidrome Web UI (`http://your-server-ip:4533`).
-   - Go to **Settings** -> **Activity / Library** -> **Quick Scan**.
-
-3. **Enjoy on TV**:
-   Open **NaviOS** on your LG TV! Your smart playlists will automatically cycle and surface in the **Top Picks** section every day at midnight.
+> [!TIP]
+> If you'd like to build more elaborate smart playlists without writing JSON by hand, check out the community [Navidrome Smart Playlist Generator](https://github.com/WB2024/Navidrome-SmartPlaylist-Generator-nsp).
 
 ---
 
-## 🚀 Building & Installing on LG webOS TV
+## 🎮 Navigation & Controls
+
+| Input | TV Mode (Remote / Keyboard) | Mobile / Touch Mode |
+| :--- | :--- | :--- |
+| **D-Pad / Arrows** | Directional spatial navigation across cards & lists | Standard touch scroll & tap |
+| **Enter / OK** | Select item / Play track (2nd click opens Now Playing) | Tap to play / Tap row |
+| **Back / Esc** | Step back in view history / Dismiss full-screen player | Swipe down / Back button |
+| **Play / Pause** | TV Remote Play/Pause media key | Mini-player / Player button |
+| **Next / Previous** | Media track skip keys | Next / Prev buttons or lock screen |
+
+---
+
+## 🛠️ Building & Packaging
 
 ### Prerequisites
-- Node.js (v18+)
-- [webOS TV CLI (`ares-*`)](https://webostv.developer.lge.com/) or [webOS Dev Manager](https://github.com/webos-tools/cli-webOS-dev-manager)
+- [Node.js](https://nodejs.org/) (v18 or newer)
+- npm
 
-### Development
+---
+
+### 1. LG webOS TV (`.ipk`)
+
+The webOS package is created using a self-contained Node.js packaging script with zero required external dependencies (it will use the official `ares-package` CLI if installed, but automatically falls back to an internal archive builder if not).
+
 ```bash
 # Install dependencies
 npm install
 
-# Start local dev server
-npm run dev
-```
-
-### Build & Package IPK
-```bash
-# Build Vite production assets & package .ipk
-npm run build
-node scripts/pack-ipk.js
+# Build production assets and create the .ipk package
+npm run package
 ```
 
 The compiled package will be generated at:
-`dist-webos/org.navios.tv_X.X.X_all.ipk`
-
-### Installation to TV
-Install the `.ipk` file to your LG TV using **webOS Dev Manager** or via the official webOS CLI:
-```bash
-ares-install dist-webos/org.navios.tv_1.7.4_all.ipk -d <your-tv-name>
+```text
+dist-webos/org.navios.tv_<version>_all.ipk
 ```
+
+#### Installing on LG webOS TV:
+- **Via GUI**: Use [webOS Dev Manager](https://github.com/webos-tools/cli-webOS-dev-manager) to connect to your TV and install the `.ipk`.
+- **Via webOS CLI**:
+  ```bash
+  ares-install dist-webos/org.navios.tv_1.9.109_all.ipk -d <your-tv-name>
+  ```
+
+---
+
+### 2. Android (`.apk`)
+
+Android support is powered by [Capacitor](https://capacitorjs.com/). The project is pre-configured with network security policies to support both HTTP and HTTPS local/remote Navidrome instances.
+
+#### Prerequisites for Android Build:
+- **Java JDK**: OpenJDK 21
+- **Android SDK**: API level 35 (Android 15) build tools
+
+#### Build Steps:
+```bash
+# 1. Build web bundle
+npm run build
+
+# 2. Sync web assets into Android project
+npx cap sync android
+
+# 3. Compile the debug APK
+cd android
+./gradlew assembleDebug
+```
+
+The generated APK will be located at:
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+#### Installing on Android Device:
+```bash
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+```
+Or open the `android` folder directly in Android Studio (`npx cap open android`) to build and run.
+
+---
+
+## 💻 Local Web Development
+
+To test and run the UI in your desktop browser:
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. By default, desktop browsers with fine pointer input will display the TV shell, while mobile viewport simulation or touch devices will automatically switch to the mobile shell.
 
 ---
 
 ## 📄 License
-Distributed under the MIT License. See `LICENSE` for more information.
+
+Distributed under the **MIT License**. See `LICENSE` for details.

@@ -1,4 +1,5 @@
 import { Component, createMemo, createSignal, For, Show } from 'solid-js';
+import { FadeImage } from '../common/FadeImage';
 import { audioPlayer } from '../../services/audio';
 import { api, Song } from '../../services/api';
 import { setGlobalSelectedAlbumId } from '../../services/uiState';
@@ -327,8 +328,7 @@ export const TabletopControlDeck: Component<TabletopControlDeckProps> = (props) 
                 >
                   <div class="flex items-center gap-3 min-w-0 flex-1">
                     <div class="w-10 h-10 rounded-lg bg-neutral-800 overflow-hidden shrink-0 grayscale brightness-75">
-                      <img
-                        src={api.getSongCoverArtUrl(song, 120)}
+                      <FadeImage src={api.getSongCoverArtUrl(song, 120)} onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }} />
                         alt={song.title}
                         class="w-full h-full object-cover"
                       />
@@ -361,8 +361,7 @@ export const TabletopControlDeck: Component<TabletopControlDeckProps> = (props) 
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="w-10 h-10 rounded-lg bg-neutral-800 overflow-hidden shrink-0">
-                        <img
-                          src={api.getSongCoverArtUrl(song, 120)}
+                        <FadeImage src={api.getSongCoverArtUrl(song, 120)} onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }} />
                           alt={song.title}
                           class="w-full h-full object-cover"
                         />

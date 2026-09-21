@@ -1,11 +1,10 @@
 import { Component, createEffect, createSignal, For, Show } from 'solid-js';
+import { FadeImage } from '../common/FadeImage';
 import { api, Album } from '../../services/api';
 import { createLongPress } from "../../hooks/useLongPress";
 import { setGlobalAlbumMenuTarget } from "../../services/uiState";
 import { AppleContextMenu } from './AppleContextMenu';
 import { MusicNoteIcon } from '../common/Icons';
-import { activeDownloads, isAlbumDownloaded, downloadProgress } from '../../services/offlineSync';
-import { DownloadProgressRing } from '../common/DownloadProgressRing';
 
 export type MobileAlbumFilter = 'newest' | 'alphabeticalByName' | 'starred';
 
@@ -18,7 +17,7 @@ interface MobileAlbumsViewProps {
 
 export const MobileAlbumsView: Component<MobileAlbumsViewProps> = (props) => {
   const [filter, setFilter] = createSignal<MobileAlbumFilter>('newest');
-  const [albums, setAlbums] = createSignal<Album[]>([]);
+  const [albums, setAlbums] = createSignal<Album[]>(api.getCachedAlbumList('newest', 40));
   const [isLoading, setIsLoading] = createSignal(false);
   const [pageOffset, setPageOffset] = createSignal(0);
   const [hasMore, setHasMore] = createSignal(true);
@@ -45,6 +44,7 @@ export const MobileAlbumsView: Component<MobileAlbumsViewProps> = (props) => {
       setHasMore(list.length >= 40);
     } catch (e) {
       console.error('Failed to load albums', e);
+      if (replace) setAlbums([]);
     } finally {
       setIsLoading(false);
     }
@@ -62,8 +62,8 @@ export const MobileAlbumsView: Component<MobileAlbumsViewProps> = (props) => {
     }, 0);
   });
 
-  const handleLoadMore = () => {
-    if (isLoading() || !hasMore()) return;
+  const loadMore = () => {
+    if (!hasMore() || isLoading()) return;
     const nextOffset = pageOffset() + 40;
     setPageOffset(nextOffset);
     fetchAlbums(filter(), nextOffset, false);
@@ -71,35 +71,34 @@ export const MobileAlbumsView: Component<MobileAlbumsViewProps> = (props) => {
 
   return (
     <div class="w-full flex flex-col gap-4 pb-28 pt-2 px-4">
-      {/* Category / Active Filter Banner if set */}
+
+      {/* Sort / filter controls */}
       <Show when={props.selectedGenre || props.selectedArtist}>
-        <div class="flex items-center justify-between bg-neutral-800/80 border border-white/10 px-4 py-2.5 rounded-2xl">
-          <div>
-            <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
-              {props.selectedGenre ? 'Genre Filter' : 'Artist Filter'}
-            </span>
-            <p class="text-base font-bold text-white leading-tight">
-              {props.selectedGenre || props.selectedArtist}
-            </p>
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xl font-black text-white tracking-tight">
+            {props.selectedGenre ? `Genre: ${props.selectedGenre}` : `Artist: ${props.selectedArtist}`}
           </div>
-          <Show when={props.onClearFilter}>
-            <button
-              onClick={props.onClearFilter}
-              class="px-3 py-1 bg-white/10 text-white rounded-full text-xs font-bold active:scale-95"
-            >
-              Clear
-            </button>
-          </Show>
+          <button 
+            onClick={() => props.onClearFilter?.()}
+            class="text-sm font-bold text-[#fa243c] active:opacity-50"
+          >
+            Clear
+          </button>
         </div>
       </Show>
 
-      {/* Single sort label — Apple Music style: quiet text button, opens a context menu */}
-      <Show when={!props.selectedGenre && !props.selectedArtist}>
+      <Show when={!props.selectedGenre && !props.selectedArtist && albums().length > 0}>
         {(() => {
           const [sortMenuRect, setSortMenuRect] = createSignal<DOMRect | null>(null);
-          const sortLabel = () => filter() === 'newest' ? 'Recently Added' : filter() === 'alphabeticalByName' ? 'Alphabetical' : 'Favorites';
+          const sortLabel = () => {
+            switch(filter()) {
+              case 'newest': return 'Recently Added';
+              case 'alphabeticalByName': return 'Alphabetical';
+              case 'starred': return 'Starred';
+            }
+          };
           return (
-            <div class="flex items-center justify-between px-0.5">
+            <div class="flex items-center justify-between h-10 px-0.5">
               <button
                 onClick={(e) => {
                   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -107,24 +106,28 @@ export const MobileAlbumsView: Component<MobileAlbumsViewProps> = (props) => {
                 }}
                 class="flex items-center gap-1 text-[#fa243c] active:opacity-50 transition-opacity"
               >
-                <span class="text-[13px] font-semibold">{sortLabel()}</span>
-                <svg class="w-3.5 h-3.5 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                <span class="text-sm font-bold tracking-tight">Sort by {sortLabel()}</span>
+                <svg class="w-4 h-4 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
 
-              <AppleContextMenu
-                isOpen={!!sortMenuRect()}
-                triggerRect={sortMenuRect()!}
-                onClose={() => setSortMenuRect(null)}
-                groups={[{
-                  items: [
-                    { label: 'Recently Added', onClick: () => { setFilter('newest'); setSortMenuRect(null); } },
-                    { label: 'Alphabetical',   onClick: () => { setFilter('alphabeticalByName'); setSortMenuRect(null); } },
-                    { label: 'Favorites',      onClick: () => { setFilter('starred'); setSortMenuRect(null); } },
-                  ]
-                }]}
-              />
+              <Show when={sortMenuRect()}>
+                <AppleContextMenu
+                  isOpen={Boolean(sortMenuRect())}
+                  triggerRect={sortMenuRect()!}
+                  onClose={() => setSortMenuRect(null)}
+                  groups={[
+                    {
+                      items: [
+                        { label: 'Recently Added', onClick: () => { setFilter('newest'); setSortMenuRect(null); }, icon: <></> },
+                        { label: 'Alphabetical', onClick: () => { setFilter('alphabeticalByName'); setSortMenuRect(null); }, icon: <></> },
+                        { label: 'Starred', onClick: () => { setFilter('starred'); setSortMenuRect(null); }, icon: <></> }
+                      ]
+                    }
+                  ]}
+                />
+              </Show>
             </div>
           );
         })()}
@@ -163,33 +166,11 @@ export const MobileAlbumsView: Component<MobileAlbumsViewProps> = (props) => {
                       </div>
                     }
                   >
-                    <img
-                      src={api.getCoverArtUrl(album.coverArt || album.id, 350)}
+                    <FadeImage src={api.getCoverArtUrl(album.coverArt || album.id, 500)}
                       alt={album.title || album.title}
-                      class="w-full h-full object-cover"
+                      class="w-full h-full "
                       loading="lazy"
                     />
-                  </Show>
-                  <Show when={activeDownloads().has(album.id) || isAlbumDownloaded(album.id)}>
-                    <div class="absolute bottom-2 right-2 flex items-center justify-center pointer-events-none">
-                      <Show when={activeDownloads().has(album.id)}>
-                        {/* Downloading spinner */}
-                        <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                          <DownloadProgressRing 
-                            progress={downloadProgress()[album.id] ? downloadProgress()[album.id].current / downloadProgress()[album.id].total : 0} 
-                            class="w-3.5 h-3.5 text-[#fa243c]" 
-                          />
-                        </div>
-                      </Show>
-                      <Show when={!activeDownloads().has(album.id) && isAlbumDownloaded(album.id)}>
-                        {/* Downloaded arrow */}
-                        <div class="w-[22px] h-[22px] rounded-full bg-[#1c1c1e]/80 backdrop-blur-md flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                          <svg class="w-3 h-3 text-[#fa243c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                          </svg>
-                        </div>
-                      </Show>
-                    </div>
                   </Show>
                 </div>
                 <p class="text-sm font-bold text-white truncate leading-tight pointer-events-none">
@@ -219,7 +200,7 @@ export const MobileAlbumsView: Component<MobileAlbumsViewProps> = (props) => {
       {/* Load More Button */}
       <Show when={hasMore() && !isLoading() && albums().length > 0}>
         <button
-          onClick={handleLoadMore}
+          onClick={loadMore}
           class="w-full py-3 mt-2 bg-neutral-800/60 border border-white/10 rounded-2xl text-xs font-bold text-neutral-300 hover:text-white active:scale-98 transition-transform"
         >
           Load More Albums

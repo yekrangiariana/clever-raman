@@ -3,6 +3,8 @@ import { Song } from '../../services/api';
 import { audioPlayer } from '../../services/audio';
 import { QueueAddIcon, HeartIcon, CheckIcon } from './Icons';
 
+import { isTrackStarred, toggleTrackStar, setTrackStarredState } from '../../services/starred';
+
 interface SongRowProps {
   song: Song;
   index: number;
@@ -22,20 +24,19 @@ function formatDuration(sec: number): string {
 }
 
 export const SongRow: Component<SongRowProps> = (props) => {
-  const [isStarred, setIsStarred] = createSignal<boolean>(!!props.song.starred);
+  const isStarred = () => isTrackStarred(props.song.id);
 
   const isUserQueued = createMemo(() => {
     return audioPlayer.isExplicitUserQueued(props.song.id);
   });
 
   createEffect(() => {
-    setIsStarred(!!props.song.starred);
+    setTrackStarredState(props.song.id, !!props.song.starred);
   });
 
-  const handleHeartClick = (e: Event) => {
+  const handleHeartClick = async (e: Event) => {
     e.stopPropagation();
-    const nextState = !isStarred();
-    setIsStarred(nextState);
+    await toggleTrackStar(props.song.id);
     if (props.onToggleStar) {
       props.onToggleStar(props.song, e);
     }

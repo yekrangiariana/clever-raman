@@ -198,13 +198,17 @@ export const NowPlayingView: Component = () => {
         <div class={`flex flex-col items-center justify-center gap-6 transition-all duration-300 ${showQueue() ? 'w-1/2 shrink-0' : 'w-full max-w-2xl'}`}>
           {/* Square Album Art */}
           <div class={`rounded-3xl overflow-hidden bg-neutral-900 shadow-2xl relative border border-white/10 shrink-0 transition-all duration-300 ${showQueue() ? 'w-[380px] h-[380px]' : 'w-[440px] h-[440px]'}`}>
-            {coverUrl() ? (
+            {coverUrl() ? (<>
               <img
                 src={coverUrl()}
                 alt={track()?.title || 'Now Playing'}
-                class="w-full h-full object-cover rounded-3xl"
+                class="w-full h-full object-cover rounded-3xl relative z-10"
+                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
               />
-            ) : (
+              <div class="w-full h-full flex items-center justify-center text-neutral-500 bg-neutral-800 absolute inset-0 z-0">
+                <MusicNoteIcon class="w-32 h-32" />
+              </div>
+            </>) : (
               <div class="w-full h-full flex items-center justify-center text-neutral-700 rounded-3xl">
                 <MusicNoteIcon class="w-32 h-32" />
               </div>
@@ -382,7 +386,7 @@ export const NowPlayingView: Component = () => {
                           <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10 opacity-70">
                             {song.coverArt || song.albumId || song.id ? (
                               <img
-                                src={api.getSongCoverArtUrl(song, 300)}
+                                src={api.getSongCoverArtUrl(song, 300)} onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                                 alt={song.title}
                                 class="w-full h-full object-cover"
                                 loading="lazy"
@@ -429,9 +433,12 @@ export const NowPlayingView: Component = () => {
                   >
                     <div class="flex items-center gap-5 truncate flex-1 min-w-0">
                       <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
-                        {coverUrl() ? (
-                          <img src={coverUrl()} alt={track()!.title} class="w-full h-full object-cover" />
-                        ) : (
+                        {coverUrl() ? (<>
+                          <img src={coverUrl()} alt={track()!.title} class="w-full h-full object-cover relative z-10" onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }} />
+                          <div class="w-full h-full flex items-center justify-center text-neutral-500 bg-neutral-800 absolute inset-0 z-0">
+                            <MusicNoteIcon class="w-16 h-16" />
+                          </div>
+                        </>) : (
                           <div class="w-full h-full flex items-center justify-center text-neutral-600">
                             <MusicNoteIcon class="w-8 h-8" />
                           </div>
@@ -473,7 +480,7 @@ export const NowPlayingView: Component = () => {
                           <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
                             {song.coverArt || song.albumId || song.id ? (
                               <img
-                                src={api.getSongCoverArtUrl(song, 300)}
+                                src={api.getSongCoverArtUrl(song, 300)} onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                                 alt={song.title}
                                 class="w-full h-full object-cover"
                                 loading="lazy"
@@ -547,7 +554,7 @@ export const NowPlayingView: Component = () => {
                           <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
                             {song.coverArt || song.albumId || song.id ? (
                               <img
-                                src={api.getSongCoverArtUrl(song, 300)}
+                                src={api.getSongCoverArtUrl(song, 300)} onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                                 alt={song.title}
                                 class="w-full h-full object-cover"
                                 loading="lazy"
@@ -624,7 +631,7 @@ export const NowPlayingView: Component = () => {
                           <div class="w-16 h-16 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 shadow-md border border-white/10">
                             {song.coverArt || song.albumId || song.id ? (
                               <img
-                                src={api.getSongCoverArtUrl(song, 300)}
+                                src={api.getSongCoverArtUrl(song, 300)} onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                                 alt={song.title}
                                 class="w-full h-full object-cover"
                                 loading="lazy"

@@ -10,11 +10,9 @@ import { MobileAlbumDetail } from './MobileAlbumDetail';
 import { MobileMiniPlayer } from './MobileMiniPlayer';
 import { MobileNowPlaying } from './MobileNowPlaying';
 import { AppleContextMenu, ContextMenuGroup } from './AppleContextMenu';
-import { AppleAlertDialog } from './AppleAlertDialog';
-import { isAlbumDownloaded, downloadCollection, removeCollection } from '../../services/offlineSync';
 import { globalAlbumMenuTarget, setGlobalAlbumMenuTarget, isSharingMedia, globalActiveTab, setGlobalActiveTab, setGlobalSearchQuery, globalSelectedAlbumId, setGlobalSelectedAlbumId, globalSelectedPlaylistId, setGlobalSelectedPlaylistId } from '../../services/uiState';
 import { shareAlbumFiles } from '../../services/share';
-import { TrashIcon, ShareIcon } from '../common/Icons';
+import { ShareIcon } from '../common/Icons';
 import { Song, api } from '../../services/api';
 import { foldState } from '../../services/foldable';
 import { TabletopControlDeck } from './TabletopControlDeck';
@@ -28,6 +26,8 @@ import {
 
 import { MobileFoldableRail } from './MobileFoldableRail';
 import { MobileAddToPlaylistSheet } from './MobileAddToPlaylistSheet';
+import { startServerReachabilityMonitor } from '../../services/serverReachability';
+import { ServerStatusBanner } from '../common/ServerStatusBanner';
 
 type MobileTab = 'home' | 'library' | 'search' | 'settings';
 
@@ -40,22 +40,16 @@ export const MobileShell: Component = () => {
   const [showNowPlaying, setShowNowPlaying] = createSignal<boolean>(false);
   const [isUnfolded, setIsUnfolded] = createSignal<boolean>(typeof window !== 'undefined' ? window.innerWidth >= 600 : false);
 
-  createEffect(async () => {
+  createEffect(() => {
     const albumId = globalSelectedAlbumId();
     if (albumId) {
-      const res = await api.getAlbum(albumId);
-      if (res && res.album) {
-        handleSelectAlbum(res.album);
-      }
+      handleSelectAlbum({ id: albumId, title: 'Album', artist: '' } as Album);
       setGlobalSelectedAlbumId(null);
     }
 
     const playlistId = globalSelectedPlaylistId();
     if (playlistId) {
-      const res = await api.getPlaylist(playlistId);
-      if (res && res.playlist) {
-        handleSelectPlaylist(res.playlist);
-      }
+      handleSelectPlaylist({ id: playlistId, name: 'Playlist' } as Playlist);
       setGlobalSelectedPlaylistId(null);
     }
   });
@@ -96,6 +90,8 @@ export const MobileShell: Component = () => {
   };
 
   onMount(() => {
+    startServerReachabilityMonitor();
+
     const handleResize = () => setIsUnfolded(window.innerWidth >= 600);
     window.addEventListener('resize', handleResize);
     onCleanup(() => window.removeEventListener('resize', handleResize));
@@ -121,9 +117,11 @@ export const MobileShell: Component = () => {
       
       <Show when={!selectedAlbum() && !selectedPlaylist() && !selectedMixGenre()}>
         <header class="w-full px-5 pt-[env(safe-area-inset-top,20px)] pb-3 flex items-center justify-between border-b border-white/5 bg-black/60 backdrop-blur-xl shrink-0 z-20">
-          <h1 class="text-3xl font-black tracking-tight text-white">
-            {tabTitles[globalActiveTab()]}
-          </h1>
+          <div class="flex items-center gap-3">
+            <h1 class="text-3xl font-black tracking-tight text-white">
+              {tabTitles[globalActiveTab()]}
+            </h1>
+          </div>
         </header>
       </Show>
 
@@ -166,9 +164,8 @@ export const MobileShell: Component = () => {
             initialPlaylist={selectedPlaylist()}
             customCoverVariant={selectedCoverVariant()}
             onClose={handleCloseDetail}
-            onNavigateToAlbum={async (albumId) => {
-              const res = await api.getAlbum(albumId);
-              if (res?.album) handleSelectAlbum(res.album);
+            onNavigateToAlbum={(albumId) => {
+              handleSelectAlbum({ id: albumId, title: 'Album', artist: '' } as Album);
             }}
           />
         </Show>
@@ -268,25 +265,9 @@ export const MobileShell: Component = () => {
 };
 
 const MobileGlobalAlbumMenu: Component = () => {
-  const [downloadConfirmId, setDownloadConfirmId] = createSignal<string | null>(null);
   const [songs, setSongs] = createSignal<Song[]>([]);
   const [showAddToPlaylist, setShowAddToPlaylist] = createSignal(false);
   const [songsToAddToPlaylist, setSongsToAddToPlaylist] = createSignal<string[]>([]);
-  
-  const handleDownloadToggle = async () => {
-    const target = globalAlbumMenuTarget();
-    if (!target) return;
-    const album = target.album;
-    if (isAlbumDownloaded(album.id)) {
-      setDownloadConfirmId(album.id);
-    } else {
-      const res = await api.getAlbum(album.id);
-      if (res && res.songs) {
-        downloadCollection(album.id, res.songs, 'album', album);
-      }
-      setGlobalAlbumMenuTarget(null);
-    }
-  };
 
   const groups = createMemo<ContextMenuGroup[]>(() => {
     const target = globalAlbumMenuTarget();
@@ -342,51 +323,17 @@ const MobileGlobalAlbumMenu: Component = () => {
       },
     ];
 
-    if (Capacitor.isNativePlatform() && target.album.id) {
-      baseGroups.push({
-        items: [
-          {
-            label: isAlbumDownloaded(target.album.id) ? 'Remove Download' : 'Download',
-            destructive: isAlbumDownloaded(target.album.id),
-            icon: isAlbumDownloaded(target.album.id) ? (
-              <TrashIcon class="w-5 h-5 text-red-500" />
-            ) : (
-              <svg class="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-            ),
-            onClick: handleDownloadToggle,
-          },
-        ],
-      });
-    }
-    
     return baseGroups;
   });
 
   return (
     <>
+      <ServerStatusBanner />
       <AppleContextMenu
         isOpen={!!globalAlbumMenuTarget()}
         triggerRect={globalAlbumMenuTarget()?.triggerRect}
         onClose={() => setGlobalAlbumMenuTarget(null)}
         groups={groups()}
-      />
-      <AppleAlertDialog
-        isOpen={!!downloadConfirmId()}
-        title="Remove Download?"
-        message="This will remove the downloaded music from your device."
-        confirmText="Remove"
-        cancelText="Cancel"
-        destructive={true}
-        onConfirm={() => {
-          const id = downloadConfirmId();
-          if (id) removeCollection(id);
-          setDownloadConfirmId(null);
-        }}
-        onClose={() => {
-          setDownloadConfirmId(null);
-        }}
       />
       <MobileAddToPlaylistSheet
         isOpen={showAddToPlaylist()}

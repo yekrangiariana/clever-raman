@@ -1,27 +1,27 @@
 import { Component, createMemo, createResource, createSignal, For, Show, createEffect } from 'solid-js';
 import { api, Album, Playlist, Song } from '../../services/api';
-import { isAlbumDownloaded, downloadCollection, removeCollection, activeDownloads, downloadProgress } from "../../services/offlineSync";
+import { isTrackStarred, isAlbumStarred, toggleTrackStar, toggleAlbumStar, setTrackStarredState, setAlbumStarredState } from '../../services/starred';
+import { FadeImage } from '../common/FadeImage';
 import { Capacitor } from "@capacitor/core";
 import { audioPlayer } from '../../services/audio';
 import { AppleContextMenu, ContextMenuGroup } from './AppleContextMenu';
 import { AppleAlertDialog } from './AppleAlertDialog';
 import { createLongPress } from '../../hooks/useLongPress';
 import { shareSongFile, shareAlbumFiles } from '../../services/share';
-import { DownloadProgressRing } from '../common/DownloadProgressRing';
 import {
   PlayIcon,
   ShuffleIcon,
   HeartIcon,
   MusicNoteIcon,
   EllipsisIcon,
-  TrashIcon,
   ShareIcon,
   QueueListIcon,
   ChevronDownIcon,
   MinusCircleIcon,
-  ArrowDownTrayIcon,
   DragHandleIcon,
+  PinIcon,
 } from '../common/Icons';
+import { isPlaylistPinned, togglePinPlaylist } from '../../services/pinnedPlaylists';
 import { MobileAddToPlaylistSheet } from './MobileAddToPlaylistSheet';
 
 interface MobileAlbumDetailProps {
@@ -44,7 +44,6 @@ function formatDuration(sec: number): string {
 
 export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
   const [isStarred, setIsStarred] = createSignal(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [selectedTrackForMenu, setSelectedTrackForMenu] = createSignal<Song | null>(null);
   const [selectedTrackIndexForMenu, setSelectedTrackIndexForMenu] = createSignal<number | null>(null);
   const [showAlbumMenu, setShowAlbumMenu] = createSignal(false);
@@ -65,6 +64,7 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
       mixGenre: props.mixGenre,
     }),
     async (params) => {
+      // Fetch over network
       if (params.albumId) {
         const res = await api.getAlbum(params.albumId);
         if (res?.album?.starred) setIsStarred(true);
@@ -115,7 +115,7 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
   const title = createMemo(() => {
     const d = detailData();
     if (d?.title) return d.title;
-    if (props.initialAlbum) return props.initialAlbum.title || props.initialAlbum.name;
+    if (props.initialAlbum) return props.initialAlbum.title;
     if (props.initialPlaylist) return props.initialPlaylist.name;
     if (props.mixGenre) return `${props.mixGenre} Mix`;
     return 'Album';
@@ -158,6 +158,10 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
           chosenClass: 'scale-[1.02]',
           forceFallback: true,
           fallbackClass: 'shadow-2xl bg-[#1e1e24] z-50 rounded-xl',
+          scroll: true,
+          scrollSensitivity: 100,
+          scrollSpeed: 18,
+          bubbleScroll: true,
           onEnd: (evt: any) => {
             const { oldIndex, newIndex, item, from } = evt;
             if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return;
@@ -184,6 +188,21 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
         sortableInstance = undefined;
       }
     }
+  });
+
+  createEffect(() => {
+    const id = collectionId();
+    if (id) {
+      const isSt = Boolean(detailData()?.album?.starred || detailData()?.playlist?.starred || props.initialAlbum?.starred);
+      setAlbumStarredState(id, isSt);
+    }
+  });
+
+  createEffect(() => {
+    const sList = songs();
+    sList.forEach(s => {
+      setTrackStarredState(s.id, Boolean(s.starred));
+    });
   });
 
   const removeTrack = (idx: number) => {
@@ -214,7 +233,7 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
     const d = detailData();
     const coverId = props.initialPlaylist?.coverArt || props.initialPlaylist?.id || props.initialAlbum?.coverArt || props.initialAlbum?.id || d?.coverArt;
     if (coverId) {
-      return api.getCoverArtUrl(coverId, 600);
+      return api.getCoverArtUrl(coverId, 500);
     }
     return '';
   });
@@ -241,24 +260,6 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
       audioPlayer.toggleShuffle();
     }
     audioPlayer.playTrack(song, list, index);
-  };
-
-  const toggleDownload = () => {
-    const id = collectionId();
-    if (!id) return;
-    if (isAlbumDownloaded(id)) {
-      setShowDeleteConfirm(true);
-    } else {
-      const type = props.playlistId ? 'playlist' : 'album';
-      const metadata = props.initialAlbum || props.initialPlaylist || {
-        id,
-        name: title(),
-        title: title(),
-        artist: artist(),
-        coverArt: coverUrl() ? id : undefined
-      };
-      downloadCollection(id, songs(), type, metadata);
-    }
   };
 
   const trackMenuGroups = createMemo<ContextMenuGroup[]>(() => {
@@ -358,29 +359,14 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
       });
     }
 
+    const isSt = isTrackStarred(track.id);
     groups.push({
       items: [
         {
-          label: track.starred ? 'Unfavorite' : 'Favorite',
-          icon: <HeartIcon class={`w-5 h-5 ${track.starred ? 'text-[#fa243c]' : 'text-neutral-400'}`} filled={!!track.starred} />,
+          label: isSt ? 'Unfavorite' : 'Favorite',
+          icon: <HeartIcon class={`w-5 h-5 ${isSt ? 'text-[#fa243c]' : 'text-neutral-400'}`} filled={isSt} />,
           onClick: async () => {
-            const isCurrentlyStarred = !!track.starred;
-            if (isCurrentlyStarred) {
-              await api.unstar(track.id);
-            } else {
-              await api.star(track.id);
-            }
-            
-            mutate(prev => {
-              if (!prev) return prev;
-              const newSongs = prev.songs.map(s => {
-                if (s.id === track.id) {
-                  return { ...s, starred: isCurrentlyStarred ? undefined : new Date().toISOString() };
-                }
-                return s;
-              });
-              return { ...prev, songs: newSongs };
-            });
+            await toggleTrackStar(track.id);
           },
         },
       ],
@@ -440,23 +426,6 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
       });
     }
 
-    if (Capacitor.isNativePlatform() && collectionId()) {
-      groups.push({
-        items: [
-          {
-            label: isAlbumDownloaded(collectionId()) ? 'Remove Download' : 'Download',
-            destructive: isAlbumDownloaded(collectionId()),
-            icon: isAlbumDownloaded(collectionId()) ? (
-              <TrashIcon class="w-5 h-5 text-red-500" />
-            ) : (
-              <ArrowDownTrayIcon class="w-5 h-5 text-neutral-400" />
-            ),
-            onClick: () => toggleDownload(),
-          },
-        ],
-      });
-    }
-
     return groups;
   });
 
@@ -464,17 +433,16 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
     <div class="relative w-full h-full flex flex-col md:flex-row bg-[#0e0e12] overflow-y-auto md:overflow-hidden overflow-x-hidden pb-32 md:pb-0 pt-[env(safe-area-inset-top,16px)] px-4 md:px-6 w-full md:gap-8">
       <Show when={coverUrl()}>
         <div class="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <img 
-            src={coverUrl()} 
+          <FadeImage src={coverUrl()} 
             alt="" 
-            class="w-full h-full object-cover filter blur-3xl opacity-30 saturate-150 scale-125 transform origin-top" 
+            class="w-full h-full  filter blur-3xl opacity-30 saturate-150 scale-125 transform origin-top" 
           />
           <div class="absolute inset-0 bg-gradient-to-b md:bg-gradient-to-r from-transparent via-[#0e0e12]/80 to-[#0e0e12]" />
         </div>
       </Show>
 
-      {/* LEFT COLUMN: Hero Cover Art & Metadata (Unfolded: 40% width) */}
-      <div class="flex flex-col items-center text-center mt-3 mb-6 z-10 relative w-full md:w-1/2 md:shrink-0 md:min-w-0 md:sticky md:top-4 md:h-fit">
+      {/* LEFT COLUMN: Hero Cover Art & Metadata (Unfolded: 45% width) */}
+      <div class="flex flex-col items-center text-center mt-3 mb-6 z-10 relative w-full md:w-[45%] md:shrink-0 md:min-w-0 md:sticky md:top-4 md:h-fit">
         <div class="w-full flex items-center justify-between py-2 mb-2">
           <Show when={!isEditingPlaylist()}>
             <button
@@ -505,39 +473,17 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
           </Show>
 
           <Show when={!isEditingPlaylist()}>
-            <div class="flex items-center gap-2">
-              <button
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setShowAlbumMenu(true);
-                  setMenuTriggerRect(rect);
-                }}
-                class="w-10 h-10 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-all shadow-md"
-                aria-label="More Options"
-              >
-                <EllipsisIcon class="w-5 h-5 text-white" />
-              </button>
-
-              <button
-                onClick={async () => {
-                  const current = isStarred();
-                  const id = collectionId();
-                  if (id) {
-                    if (current) await api.unstar(id);
-                    else await api.star(id);
-                  }
-                  setIsStarred(!current);
-                }}
-                class={`w-10 h-10 rounded-2xl border backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-md ${
-                  isStarred()
-                    ? 'bg-[#fa243c]/30 border-[#fa243c] text-[#fa243c]'
-                    : 'bg-white/10 hover:bg-white/20 border-white/15 text-white'
-                }`}
-                aria-label="Favorite"
-              >
-                <HeartIcon class={`w-5 h-5 ${isStarred() ? 'text-[#fa243c]' : 'text-white'}`} filled={isStarred()} />
-              </button>
-            </div>
+            <button
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setShowAlbumMenu(true);
+                setMenuTriggerRect(rect);
+              }}
+              class="w-10 h-10 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-all shadow-md ml-auto"
+              aria-label="More Options"
+            >
+              <EllipsisIcon class="w-5 h-5 text-white" />
+            </button>
           </Show>
         </div>
 
@@ -588,7 +534,7 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
                 </div>
               }
             >
-              <img src={coverUrl()} alt={title()} class="w-full h-full object-cover" />
+              <FadeImage src={coverUrl()} alt={title()} class="w-full h-full" />
             </Show>
           </Show>
         </div>
@@ -605,18 +551,7 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
           {songs().length} TRACKS • {formatDuration(songs().reduce((acc, s) => acc + (s.duration || 0), 0))}
         </p>
         
-        {/* Subtitle space for download progress if active */}
-        <Show when={activeDownloads().has(collectionId())}>
-          <div class="text-[11px] font-bold text-[#fa243c] mt-2 uppercase tracking-widest flex items-center justify-center gap-1.5">
-            <DownloadProgressRing 
-              progress={downloadProgress()[collectionId()] ? downloadProgress()[collectionId()].current / downloadProgress()[collectionId()].total : 0} 
-              class="w-3 h-3 text-[#fa243c]" 
-            />
-            Downloading... {downloadProgress()[collectionId()]?.total ? `(${downloadProgress()[collectionId()].current}/${downloadProgress()[collectionId()].total})` : ''}
-          </div>
-        </Show>
-
-        {/* Apple Music 3-Pill Hero Action Capsule: [ 🔀 Shuffle ] [ ▶ Play ] [ + Download ] */}
+        {/* Apple Music Hero Action Capsule: [ 🔀 Shuffle ] [ ▶ Play ] [ ♥ Heart ] */}
         <div class="flex items-center justify-center gap-2.5 w-full max-w-sm mt-5 px-2">
           <button
             onClick={() => handlePlayAll(true)}
@@ -634,22 +569,43 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
             <span class="text-sm">Play</span>
           </button>
 
+          <Show when={props.playlistId}>
+            <button
+              onClick={() => togglePinPlaylist(props.playlistId)}
+              class={`w-12 h-12 rounded-2xl border backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-md shrink-0 ${
+                isPlaylistPinned(props.playlistId)
+                  ? 'bg-amber-500/30 border-amber-500 text-amber-400'
+                  : 'bg-white/10 hover:bg-white/20 border-white/15 text-white'
+              }`}
+              title={isPlaylistPinned(props.playlistId) ? "Unpin from Home" : "Pin to Home"}
+              aria-label="Pin to Home"
+            >
+              <PinIcon class={`w-5 h-5 ${isPlaylistPinned(props.playlistId) ? 'text-amber-400' : 'text-white'}`} filled={isPlaylistPinned(props.playlistId)} />
+            </button>
+          </Show>
+
           <button
-            onClick={toggleDownload}
-            class={`w-12 h-12 border backdrop-blur-md rounded-2xl flex items-center justify-center shadow-md active:scale-95 transition-all shrink-0 ${
-              isAlbumDownloaded(collectionId())
+            onClick={async () => {
+              const id = collectionId();
+              if (id) {
+                await toggleAlbumStar(id);
+              }
+            }}
+            class={`w-12 h-12 rounded-2xl border backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-md shrink-0 ${
+              isAlbumStarred(collectionId())
                 ? 'bg-[#fa243c]/30 border-[#fa243c] text-[#fa243c]'
                 : 'bg-white/10 hover:bg-white/20 border-white/15 text-white'
             }`}
-            title="Download Collection"
+            title="Favorite"
+            aria-label="Favorite"
           >
-            <ArrowDownTrayIcon class="w-5 h-5" />
+            <HeartIcon class={`w-5 h-5 ${isAlbumStarred(collectionId()) ? 'text-[#fa243c]' : 'text-white'}`} filled={isAlbumStarred(collectionId())} />
           </button>
         </div>
       </div>
 
       {/* RIGHT COLUMN: Tracklist Container (Unfolded: side column starting at cover art level) */}
-      <div class="w-full md:w-1/2 md:shrink-0 md:min-w-0 flex flex-col z-10 relative mt-2 md:mt-0 md:overflow-y-auto md:h-full md:pt-16 md:pb-28 md:pr-6">
+      <div class="w-full md:w-[55%] md:shrink-0 md:min-w-0 flex flex-col z-10 relative mt-2 md:mt-0 md:overflow-y-auto md:h-full md:pt-16 md:pb-28 md:pr-6">
         <Show when={detailData.loading}>
           <div class="py-8 flex items-center justify-center text-xs font-bold text-neutral-400 animate-pulse">
             Loading tracks...
@@ -751,20 +707,6 @@ export const MobileAlbumDetail: Component<MobileAlbumDetailProps> = (props) => {
         </For>
       </div>
       </div>
-
-      <AppleAlertDialog
-        isOpen={showDeleteConfirm()}
-        title="Remove Download?"
-        message="This will remove the downloaded music from your device. You can stream or redownload it anytime."
-        confirmText="Remove"
-        cancelText="Cancel"
-        destructive={true}
-        onConfirm={() => {
-          const id = collectionId();
-          if (id) removeCollection(id);
-        }}
-        onClose={() => setShowDeleteConfirm(false)}
-      />
 
       <AppleContextMenu
         isOpen={!!selectedTrackForMenu()}

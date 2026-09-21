@@ -1,6 +1,8 @@
-import { Component, createMemo, createSignal, For, Show } from 'solid-js';
+import { Component, createMemo, createSignal, For, Show, createEffect, onMount, onCleanup } from 'solid-js';
 import { audioPlayer } from '../../services/audio';
 import { api, Song } from '../../services/api';
+import { isTrackStarred, toggleTrackStar, setTrackStarredState } from '../../services/starred';
+import { FadeImage } from '../common/FadeImage';
 import { foldState } from '../../services/foldable';
 import { TabletopControlDeck } from './TabletopControlDeck';
 import {
@@ -17,6 +19,7 @@ import {
   ChevronDownIcon,
   MusicNoteIcon,
   TrashIcon,
+  ChevronRightIcon,
 } from '../common/Icons';
 
 interface MobileNowPlayingProps {
@@ -30,10 +33,66 @@ function formatDuration(sec: number): string {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
+const MarqueeTitle: Component<{ title: string; class?: string }> = (props) => {
+  let containerRef: HTMLDivElement | undefined;
+  let textMeasureRef: HTMLHeadingElement | undefined;
+  const [isOverflowing, setIsOverflowing] = createSignal(false);
+
+  const check = () => {
+    if (containerRef && textMeasureRef) {
+      setIsOverflowing(textMeasureRef.clientWidth > containerRef.clientWidth);
+    }
+  };
+
+  createEffect(() => {
+    props.title;
+    check();
+  });
+
+  onMount(() => {
+    const ro = new ResizeObserver(() => check());
+    if (containerRef) ro.observe(containerRef);
+    if (textMeasureRef) ro.observe(textMeasureRef);
+    onCleanup(() => ro.disconnect());
+  });
+
+  return (
+    <div ref={containerRef} class={`relative overflow-hidden w-full flex items-center ${props.class || ''}`}>
+      <div class="absolute opacity-0 pointer-events-none -z-10 w-max" aria-hidden="true">
+        <h2 ref={textMeasureRef} class="text-xl md:text-2xl font-bold tracking-tight">
+          {props.title}
+        </h2>
+      </div>
+
+      <Show 
+        when={isOverflowing()}
+        fallback={
+          <h2 class="text-xl md:text-2xl font-bold truncate tracking-tight text-white drop-shadow">
+            {props.title}
+          </h2>
+        }
+      >
+        <div 
+           class="w-full flex-1 overflow-hidden" 
+           style={{ "mask-image": "linear-gradient(to right, black 0%, black calc(100% - 40px), transparent calc(100% - 16px))", "-webkit-mask-image": "linear-gradient(to right, black 0%, black calc(100% - 40px), transparent calc(100% - 16px))" }}
+        >
+          <div class="flex w-max animate-marquee-loop text-xl md:text-2xl font-bold tracking-tight text-white drop-shadow">
+            <span class="pr-12">{props.title}</span>
+            <span class="pr-12">{props.title}</span>
+          </div>
+        </div>
+        
+        <div class="absolute right-0 top-0 bottom-0 flex items-center justify-end pointer-events-none">
+          <ChevronRightIcon class="w-5 h-5 text-white/90 drop-shadow-md" />
+        </div>
+      </Show>
+    </div>
+  );
+};
+
 export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
   const track = () => audioPlayer.currentTrack();
   const isPlaying = () => audioPlayer.isPlaying();
-  const [isStarred, setIsStarred] = createSignal<boolean>(false);
   const [activeSheet, setActiveSheet] = createSignal<'none' | 'queue' | 'lyrics'>('none');
   const [isDragging, setIsDragging] = createSignal<boolean>(false);
   const [dragTime, setDragTime] = createSignal<number | null>(null);
@@ -41,11 +100,28 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
   let progressBarRef: HTMLDivElement | undefined;
   let tabletopProgressBarRef: HTMLDivElement | undefined;
 
+  createEffect(() => {
+    const t = track();
+    if (t) {
+      setTrackStarredState(t.id, Boolean(t.starred));
+    }
+  });
+
+  const isStarred = () => {
+    const t = track();
+    return t ? isTrackStarred(t.id) : false;
+  };
+
+  const handleToggleStar = async () => {
+    const t = track();
+    if (!t) return;
+    await toggleTrackStar(t.id);
+  };
+
   const coverUrl = createMemo(() => {
     const t = track();
     if (!t) return '';
-    if (t.starred) setIsStarred(true);
-    return api.getSongCoverArtUrl(t, 600);
+    return api.getSongCoverArtUrl(t, 500);
   });
 
   const effectiveTime = createMemo(() => {
@@ -66,18 +142,6 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
     const rem = Math.max(0, dur - cur);
     return `-${formatDuration(rem)}`;
   });
-
-  const handleToggleStar = async () => {
-    const t = track();
-    if (!t) return;
-    const nextState = !isStarred();
-    setIsStarred(nextState);
-    if (nextState) {
-      await api.star(t.id);
-    } else {
-      await api.unstar(t.id);
-    }
-  };
 
   function getTimeFromPointer(e: PointerEvent, targetRef?: HTMLDivElement): number {
     const ref = targetRef || progressBarRef;
@@ -186,10 +250,9 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
           {/* Dynamic Full-Bleed Saturated Ambient Blurred Artwork Background */}
           <div class="absolute inset-0 pointer-events-none overflow-hidden">
             <Show when={coverUrl()}>
-              <img
-                src={coverUrl()}
+              <FadeImage src={coverUrl()}
                 alt=""
-                class="w-full h-full object-cover filter blur-3xl opacity-75 saturate-200 scale-150 transform-gpu"
+                class="w-full h-full  filter blur-3xl opacity-75 saturate-200 scale-150 transform-gpu"
               />
             </Show>
             <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/75" />
@@ -199,7 +262,7 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
           <div class="relative z-10 flex flex-col md:flex-row h-full w-full px-4 md:px-6 pt-[env(safe-area-inset-top,20px)] pb-[env(safe-area-inset-bottom,20px)] justify-between md:gap-8 md:py-6">
             
             {/* LEFT PANE: Album Art, Info & Controls */}
-            <div class="w-full md:w-1/2 md:shrink-0 md:min-w-0 flex flex-col h-full max-w-md mx-auto md:max-w-none md:mx-0 justify-between">
+            <div class="w-full md:w-[45%] md:shrink-0 md:min-w-0 flex flex-col h-full max-w-md mx-auto md:max-w-none md:mx-0 justify-between">
               {/* Top Dismiss Handle & Bar */}
               <div class="flex items-center justify-between pt-2 pb-2 gap-3">
                 <button
@@ -232,10 +295,10 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
                       </div>
                     }
                   >
-                    <img
+                    <FadeImage
                       src={coverUrl()}
                       alt={track()?.title}
-                      class="w-full h-full object-cover select-none"
+                      class="w-full h-full select-none"
                     />
                   </Show>
                 </div>
@@ -247,7 +310,7 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
                 {/* Track Info */}
                 <div class="flex items-center justify-between gap-4">
                   <div class="min-w-0 flex-1 flex flex-col">
-                    <h2 class="text-xl md:text-2xl font-bold truncate tracking-tight text-white drop-shadow">{track()?.title || 'No Track'}</h2>
+                    <MarqueeTitle title={track()?.title || 'No Track'} />
                     <p class="text-base text-neutral-300 truncate opacity-90 mt-0.5">{track()?.artist || 'Unknown Artist'}</p>
                   </div>
                   <button
@@ -359,7 +422,7 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
             </div>
 
             {/* RIGHT PANE: Playing Next Queue Side-by-Side in Unfolded Mode OR Slide-over Drawer in Folded Mode */}
-            <div class={`w-full md:w-1/2 md:shrink-0 md:min-w-0 flex-col transition-all duration-300 ${
+            <div class={`w-full md:w-[55%] md:shrink-0 md:min-w-0 flex-col transition-all duration-300 ${
               activeSheet() === 'queue' ? 'flex' : 'hidden md:flex'
             } absolute inset-0 z-40 bg-black/80 backdrop-blur-3xl md:relative md:inset-auto md:z-auto md:bg-transparent md:backdrop-blur-none md:border-none md:rounded-none md:px-0 md:pr-6 md:h-full md:shadow-none overflow-hidden px-6 pt-[env(safe-area-inset-top,24px)] pb-[env(safe-area-inset-bottom,24px)] md:pt-16 md:pb-0`}>
               
@@ -385,10 +448,10 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
                     >
                       <div class="flex items-center gap-3 min-w-0 flex-1">
                         <div class="w-10 h-10 rounded-lg bg-neutral-800 overflow-hidden shrink-0 grayscale brightness-75">
-                          <img
+                          <FadeImage
                             src={api.getSongCoverArtUrl(song, 120)}
                             alt={song.title}
-                            class="w-full h-full object-cover"
+                            class="w-full h-full"
                           />
                         </div>
                         <div class="min-w-0 flex-1">
@@ -419,11 +482,11 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
                       >
                         <div class="flex items-center gap-3 min-w-0 flex-1">
                           <div class="w-10 h-10 rounded-lg bg-neutral-800 overflow-hidden shrink-0">
-                            <img
-                              src={api.getSongCoverArtUrl(song, 120)}
-                              alt={song.title}
-                              class="w-full h-full object-cover"
-                            />
+                              <FadeImage
+                                src={api.getSongCoverArtUrl(song, 120)}
+                                alt={song.title}
+                                class="w-full h-full"
+                              />
                           </div>
                           <div class="min-w-0 flex-1">
                             <p class="text-sm font-semibold truncate leading-tight">{song.title}</p>
@@ -465,10 +528,9 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
         {/* Full-Screen Dynamic Ambient Blur Background (Extends across both top & bottom panels) */}
         <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-60">
           <Show when={coverUrl()}>
-            <img
-              src={coverUrl()}
+            <FadeImage src={coverUrl()}
               alt=""
-              class="w-full h-full object-cover filter blur-3xl scale-125 transform-gpu saturate-150"
+              class="w-full h-full  filter blur-3xl scale-125 transform-gpu saturate-150"
             />
           </Show>
           <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/85" />
@@ -480,7 +542,7 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
           {/* Hero Content: Cover Art + Title/Artist Side-by-Side */}
           <div class="flex items-center gap-6 my-auto px-4">
             {/* Cover Art */}
-            <div class="w-44 h-44 sm:w-52 sm:h-52 md:w-56 md:h-56 rounded-3xl overflow-hidden shadow-2xl border border-white/20 shrink-0 bg-neutral-900">
+            <div class="w-44 h-44 sm:w-52 sm:h-52 md:w-56 md:h-56 rounded-3xl overflow-hidden shadow-2xl border border-white/20 shrink-0 bg-neutral-900 relative">
               <Show
                 when={coverUrl()}
                 fallback={
@@ -489,7 +551,10 @@ export const MobileNowPlaying: Component<MobileNowPlayingProps> = (props) => {
                   </div>
                 }
               >
-                <img src={coverUrl()} alt={track()?.title} class="w-full h-full object-cover" />
+                <FadeImage src={coverUrl()} alt={track()?.title} class="w-full h-full relative z-10" />
+                <div class="w-full h-full flex items-center justify-center text-neutral-500 bg-neutral-800 absolute inset-0 z-0">
+                  <MusicNoteIcon class="w-16 h-16" />
+                </div>
               </Show>
             </div>
 

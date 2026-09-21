@@ -2,6 +2,7 @@ import { Component, createSignal, onMount, onCleanup, Show } from 'solid-js';
 import { MobileShell } from './components/mobile/MobileShell';
 import { TVShell } from './components/tv/TVShell';
 import { Capacitor } from '@capacitor/core';
+import { ServerStatusBanner } from './components/common/ServerStatusBanner';
 
 export const App: Component = () => {
   const detectMobile = () => {
@@ -51,9 +52,12 @@ export const App: Component = () => {
   });
 
   return (
-    <Show when={isMobile()} fallback={<TVShell />}>
-      <MobileShell />
-    </Show>
+    <>
+      <ServerStatusBanner />
+      <Show when={isMobile()} fallback={<TVShell />}>
+        <MobileShell />
+      </Show>
+    </>
   );
 };
 

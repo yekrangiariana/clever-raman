@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(FoldablePlugin.class);
         super.onCreate(savedInstanceState);
+        WebView.setWebContentsDebuggingEnabled(true);
         try {
             WebView webView = getBridge().getWebView();
             if (webView != null) {

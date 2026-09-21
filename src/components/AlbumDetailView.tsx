@@ -4,7 +4,8 @@ import { api, Song, Album, Playlist } from '../services/api';
 import { audioPlayer } from '../services/audio';
 import { focusEngine } from '../services/focus';
 import { TrackRow } from './common/TrackRow';
-import { PlayIcon, ShuffleIcon, QueueAddIcon, HeartIcon, MusicNoteIcon, CheckIcon } from './common/Icons';
+import { PlayIcon, MusicNoteIcon, ShuffleIcon, QueueAddIcon, CheckIcon, HeartIcon, PinIcon } from './common/Icons';
+import { isPlaylistPinned, togglePinPlaylist } from '../services/pinnedPlaylists';
 
 interface CollectionData {
   title: string;
@@ -232,15 +233,16 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
     }
   };
 
-  // Header buttons: 0=play, 1=shuffle, 2=queue, 3=star (albums only). Tracks start after.
+  // Header buttons: 0=play, 1=shuffle, 2=queue, 3=pin (playlists only), 4=star (albums only). Tracks start after.
   const indices = () => {
     let idx = 0;
     const playIdx = idx++;
     const shuffleIdx = idx++;
     const queueIdx = idx++;
+    const pinIdx = data()?.playlistId ? idx++ : null;
     const starIdx = data()?.albumId ? idx++ : null;
     const trackStartIdx = idx;
-    return { playIdx, shuffleIdx, queueIdx, starIdx, trackStartIdx };
+    return { playIdx, shuffleIdx, queueIdx, pinIdx, starIdx, trackStartIdx };
   };
 
   return (
@@ -380,6 +382,23 @@ export const AlbumDetailView: Component<AlbumDetailViewProps> = (props) => {
               >
                 {isAlbumInQueue() ? <CheckIcon class="w-7 h-7 text-white" /> : <QueueAddIcon class="w-7 h-7" />}
               </button>
+
+              {data().playlistId && indices().pinIdx !== null && (
+                <button
+                  onClick={() => togglePinPlaylist(data().playlistId!)}
+                  class={`w-14 h-14 rounded-full flex items-center justify-center border transition-all shadow-xl ${
+                    isPlaylistPinned(data().playlistId!)
+                      ? 'bg-amber-500/20 border-amber-400 text-amber-400'
+                      : 'bg-neutral-800/90 border-neutral-700 text-neutral-300 hover:text-white'
+                  }`}
+                  data-focusable="true"
+                  data-section="albumDetail"
+                  data-index={indices().pinIdx!}
+                  title={isPlaylistPinned(data().playlistId!) ? "Unpin from Home" : "Pin to Home"}
+                >
+                  <PinIcon filled={isPlaylistPinned(data().playlistId!)} class="w-7 h-7" />
+                </button>
+              )}
 
               {data().albumId && indices().starIdx !== null && (
                 <button

@@ -1,4 +1,5 @@
 import { Component, createEffect, createResource, createSignal, For, Show } from 'solid-js';
+import { FadeImage } from '../common/FadeImage';
 import { api, Album, Song, SearchResult } from '../../services/api';
 import { globalSearchQuery, setGlobalSearchQuery } from "../../services/uiState";
 
@@ -65,7 +66,7 @@ export const MobileSearchView: Component<MobileSearchViewProps> = (props) => {
     } catch (e) {
       return [];
     }
-  });
+  }, { initialValue: api.getCachedGenres().filter((g) => g.songCount > 0) });
 
   return (
     <div class="w-full flex flex-col gap-5 pb-28 pt-2 px-4">
@@ -101,9 +102,11 @@ export const MobileSearchView: Component<MobileSearchViewProps> = (props) => {
       {/* When Empty: Apple Music Browse Categories & Genres */}
       <Show when={!globalSearchQuery()}>
         <div>
-          <h2 class="text-xl font-black text-white tracking-tight mb-3">
-            Browse Categories
-          </h2>
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-xl font-black text-white tracking-tight">
+              Browse Categories
+            </h2>
+          </div>
 
           <div class="grid grid-cols-2 gap-3">
             <For each={genres()}>
@@ -144,8 +147,7 @@ export const MobileSearchView: Component<MobileSearchViewProps> = (props) => {
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="w-10 h-10 rounded-xl bg-neutral-800 overflow-hidden shrink-0 border border-white/5">
-                        <img
-                          src={api.getSongCoverArtUrl(song, 120)}
+                        <FadeImage src={api.getSongCoverArtUrl(song, 120)} onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }} />
                           alt={song.title}
                           class="w-full h-full object-cover"
                         />
@@ -183,10 +185,9 @@ export const MobileSearchView: Component<MobileSearchViewProps> = (props) => {
                     class="flex flex-col active:scale-95 transition-transform cursor-pointer"
                   >
                     <div class="aspect-square w-full rounded-2xl bg-neutral-900 overflow-hidden shadow-lg border border-white/10 mb-2">
-                      <img
-                        src={api.getCoverArtUrl(album.coverArt || album.id, 350)}
+                      <FadeImage src={api.getCoverArtUrl(album.coverArt || album.id, 500)}
                         alt={album.title || album.title}
-                        class="w-full h-full object-cover"
+                        class="w-full h-full "
                       />
                     </div>
                     <p class="text-sm font-bold text-white truncate leading-tight">

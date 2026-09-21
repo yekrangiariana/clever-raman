@@ -1,6 +1,8 @@
 import { Component, createResource, createSignal, For, Show, createEffect } from 'solid-js';
+import { FadeImage } from '../common/FadeImage';
 import { api, Playlist } from '../../services/api';
 import { PlaylistsIcon } from '../common/Icons';
+import { getScopedKey } from '../../services/profiles';
 import { AppleAlertDialog } from './AppleAlertDialog';
 import { foldState } from '../../services/foldable';
 
@@ -26,8 +28,9 @@ export const MobileAddToPlaylistSheet: Component<MobileAddToPlaylistSheetProps> 
   const [isSubmitting, setIsSubmitting] = createSignal(false);
   const [errorDialog, setErrorDialog] = createSignal<string | null>(null);
   const [addedToPlaylists, setAddedToPlaylists] = createSignal<string[]>([]);
+
   const [knownReadOnly, setKnownReadOnly] = createSignal<string[]>(
-    JSON.parse(localStorage.getItem('navios_readonly_playlists') || '[]')
+    JSON.parse(localStorage.getItem(getScopedKey('navios_readonly_playlists')) || '[]')
   );
 
   const markAsReadOnly = (id: string) => {
@@ -35,7 +38,7 @@ export const MobileAddToPlaylistSheet: Component<MobileAddToPlaylistSheetProps> 
     if (!current.includes(id)) {
       const next = [...current, id];
       setKnownReadOnly(next);
-      localStorage.setItem('navios_readonly_playlists', JSON.stringify(next));
+      localStorage.setItem(getScopedKey('navios_readonly_playlists'), JSON.stringify(next));
     }
   };
 
@@ -358,10 +361,9 @@ export const MobileAddToPlaylistSheet: Component<MobileAddToPlaylistSheetProps> 
                             when={coverUrl()}
                             fallback={<PlaylistsIcon class="w-6 h-6 text-white/30" />}
                           >
-                            <img
-                              src={coverUrl()}
+                            <FadeImage src={coverUrl()}
                               alt=""
-                              class="w-full h-full object-cover"
+                              class="w-full h-full "
                               loading="lazy"
                             />
                           </Show>

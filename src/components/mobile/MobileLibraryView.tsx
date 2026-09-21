@@ -1,8 +1,5 @@
 import { Component, Show } from 'solid-js';
 import { Album, Playlist } from '../../services/api';
-import { MobileDownloadedView } from "./MobileDownloadedView";
-import { Capacitor } from "@capacitor/core";
-import { offlineManifest } from "../../services/offlineSync";
 import { MobileAlbumsView } from './MobileAlbumsView';
 import { MobilePlaylistsView } from './MobilePlaylistsView';
 import { globalLibrarySegment, setGlobalLibrarySegment } from '../../services/uiState';
@@ -15,7 +12,7 @@ interface MobileLibraryViewProps {
 export const MobileLibraryView: Component<MobileLibraryViewProps> = (props) => {
   return (
     <div class="w-full flex flex-col gap-3 pb-28 pt-2 px-4">
-      {/* Native UISegmentedControl-style — tight, quiet, consistent with app dark language */}
+      {/* Native UISegmentedControl-style */}
       <div class="w-full p-1 rounded-[10px] flex items-center gap-0.5" style={{ background: 'rgba(255,255,255,0.08)' }}>
         <button
           onClick={() => setGlobalLibrarySegment('albums')}
@@ -38,19 +35,6 @@ export const MobileLibraryView: Component<MobileLibraryViewProps> = (props) => {
         >
           Playlists
         </button>
-
-        <Show when={Capacitor.isNativePlatform()}>
-          <button
-            onClick={() => setGlobalLibrarySegment('downloads')}
-            class={`flex-1 py-[7px] rounded-[8px] text-[13px] font-semibold transition-all duration-150 text-center active:opacity-70 tracking-[-0.2px] ${
-              globalLibrarySegment() === 'downloads'
-                ? 'bg-[#fa243c]/90 text-white shadow-sm'
-                : 'text-neutral-400'
-            }`}
-          >
-            Downloads
-          </button>
-        </Show>
       </div>
 
       {/* Segment Content */}
@@ -71,13 +55,6 @@ export const MobileLibraryView: Component<MobileLibraryViewProps> = (props) => {
             onSelectPlaylist={props.onSelectPlaylist}
           />
         </div>
-      </Show>
-
-      <Show when={globalLibrarySegment() === 'downloads'}>
-        <MobileDownloadedView
-          onSelectAlbum={props.onSelectAlbum}
-          onSelectPlaylist={props.onSelectPlaylist}
-        />
       </Show>
     </div>
   );

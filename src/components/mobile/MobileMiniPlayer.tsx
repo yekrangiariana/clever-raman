@@ -1,4 +1,5 @@
 import { Component, createMemo, Show } from 'solid-js';
+import { FadeImage } from '../common/FadeImage';
 import { audioPlayer } from '../../services/audio';
 import { api } from '../../services/api';
 import { PlayIcon, PauseIcon, SkipNextIcon, MusicNoteIcon } from '../common/Icons';
@@ -39,16 +40,21 @@ export const MobileMiniPlayer: Component<MobileMiniPlayerProps> = (props) => {
 
           {/* Left: Album Artwork + Metadata */}
           <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
-            <div class="w-10 h-10 rounded-xl bg-neutral-800 overflow-hidden shrink-0 shadow-md flex items-center justify-center border border-white/10">
+            <div class="w-10 h-10 rounded-xl bg-neutral-800 overflow-hidden shrink-0 shadow-md flex items-center justify-center border border-white/10 relative">
               <Show 
                 when={coverUrl()} 
                 fallback={<MusicNoteIcon class="w-5 h-5 text-neutral-500" />}
               >
-                <img 
-                  src={coverUrl()} 
+                <FadeImage src={coverUrl()} 
                   alt={track()?.title} 
-                  class="w-full h-full object-cover" 
+                  class="w-full h-full  relative z-10" 
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = 'none';
+                  }}
                 />
+                <div class="w-full h-full flex items-center justify-center text-neutral-500 bg-neutral-800 absolute inset-0 z-0">
+                  <MusicNoteIcon class="w-5 h-5" />
+                </div>
               </Show>
             </div>
 

@@ -95,6 +95,11 @@ export function getActiveProfileId(): string | null {
   }
 }
 
+export function getScopedKey(baseKey: string): string {
+  const pid = getActiveProfileId() || 'default';
+  return `${baseKey}_${pid}`;
+}
+
 export function setActiveProfileId(id: string): void {
   try {
     localStorage.setItem(ACTIVE_PROFILE_ID_KEY, id);

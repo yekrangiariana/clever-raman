@@ -1,7 +1,9 @@
 import { Component, createSignal, createEffect, createMemo } from 'solid-js';
 import { Song } from '../../services/api';
 import { audioPlayer } from '../../services/audio';
-import { QueueAddIcon, HeartIcon, CheckIcon } from './Icons';
+import { HeartIcon, CheckIcon, PlayNextIcon, PlayLastIcon } from './Icons';
+
+import { isTrackStarred, toggleTrackStar, setTrackStarredState } from '../../services/starred';
 
 interface TrackRowProps {
   song: Song;
@@ -17,20 +19,19 @@ interface TrackRowProps {
 }
 
 export const TrackRow: Component<TrackRowProps> = (props) => {
-  const [isStarred, setIsStarred] = createSignal<boolean>(!!props.song.starred);
+  const isStarred = () => isTrackStarred(props.song.id);
 
   const isUserQueued = createMemo(() => {
     return audioPlayer.isExplicitUserQueued(props.song.id);
   });
 
   createEffect(() => {
-    setIsStarred(!!props.song.starred);
+    setTrackStarredState(props.song.id, !!props.song.starred);
   });
 
-  const handleHeartClick = (e: Event) => {
+  const handleHeartClick = async (e: Event) => {
     e.stopPropagation();
-    const nextState = !isStarred();
-    setIsStarred(nextState);
+    await toggleTrackStar(props.song.id);
     if (props.onToggleStar) {
       props.onToggleStar(props.song, e);
     }
@@ -71,27 +72,27 @@ export const TrackRow: Component<TrackRowProps> = (props) => {
       </div>
 
       <div class="flex items-center gap-4 shrink-0 ml-4">
-                <button
+        <button
           onClick={(e) => {
             e.stopPropagation();
             audioPlayer.addToUserQueue(props.song, true, true);
           }}
-          class="p-2.5 rounded-full transition-colors flex items-center justify-center border shadow-md bg-neutral-800/90 border-neutral-700/80 text-neutral-400 hover:text-white hover:bg-neutral-700"
+          class="p-2.5 rounded-full transition-colors flex items-center justify-center border shadow-md bg-neutral-800/90 border-neutral-700/80 text-neutral-300 hover:text-white hover:bg-neutral-700"
           data-focusable="true"
+          data-variant="topPick"
           data-section={`${props.section}_next`}
           data-index={props.focusIndex}
           title="Play Next"
         >
-          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-          </svg>
+          <PlayNextIcon class="w-6 h-6" />
         </button>
-<button
+
+        <button
           onClick={handleQueueClick}
           class={`p-2.5 rounded-full transition-colors flex items-center justify-center shadow-md ${
             isUserQueued()
               ? 'bg-emerald-600 border border-emerald-400 text-white is-added'
-              : 'bg-neutral-800/90 border border-neutral-700/80 text-white hover:bg-neutral-700'
+              : 'bg-neutral-800/90 border border-neutral-700/80 text-neutral-300 hover:text-white hover:bg-neutral-700'
           }`}
           data-focusable="true"
           data-variant="topPick"
@@ -100,7 +101,7 @@ export const TrackRow: Component<TrackRowProps> = (props) => {
           data-index={props.focusIndex}
           title={isUserQueued() ? "In Queue (Click to Remove)" : "Play Last"}
         >
-          {isUserQueued() ? <CheckIcon class="w-6 h-6 text-white" /> : <QueueAddIcon class="w-6 h-6" />}
+          {isUserQueued() ? <CheckIcon class="w-6 h-6 text-white" /> : <PlayLastIcon class="w-6 h-6" />}
         </button>
 
         <button

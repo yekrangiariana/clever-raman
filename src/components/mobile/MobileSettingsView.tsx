@@ -10,8 +10,6 @@ import { clearSearchCache } from '../SearchView';
 import { clearAlbumCache } from '../MainGrid';
 import pkg from '../../../package.json';
 import { SettingsIcon } from '../common/Icons';
-import { MobileStorageSheet } from './MobileStorageSheet';
-import { globalStorageSheetOpen, setGlobalStorageSheetOpen } from '../../services/uiState';
 
 export const MobileSettingsView: Component = () => {
   const [statusMsg, setStatusMsg] = createSignal<string>('');
@@ -26,6 +24,10 @@ export const MobileSettingsView: Component = () => {
   const [passwordInput, setPasswordInput] = createSignal(config()?.password || '123');
 
   const handleTestConnection = async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStatusMsg('You appear to be offline.');
+      return;
+    }
     const cfg = config();
     setIsTesting(true);
     setStatusMsg('Testing connection...');
@@ -180,15 +182,6 @@ export const MobileSettingsView: Component = () => {
         </h2>
         <div class="bg-white/10 backdrop-blur-2xl border border-white/15 rounded-2xl divide-y divide-white/10 overflow-hidden shadow-lg">
           <div
-            onClick={() => setGlobalStorageSheetOpen(true)}
-            class="p-4 flex items-center justify-between text-neutral-200 hover:text-white active:bg-white/10 transition-colors cursor-pointer"
-          >
-            <span class="text-xs font-bold">Offline Storage</span>
-            <div class="flex items-center gap-1 text-neutral-400">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
-            </div>
-          </div>
-          <div
             onClick={handleClearAllCaches}
             class="p-4 flex items-center justify-between text-neutral-200 hover:text-white active:bg-white/10 transition-colors cursor-pointer"
           >
@@ -201,11 +194,6 @@ export const MobileSettingsView: Component = () => {
           </div>
         </div>
       </div>
-
-      <MobileStorageSheet 
-        isOpen={globalStorageSheetOpen()} 
-        onClose={() => setGlobalStorageSheetOpen(false)} 
-      />
     </div>
   );
 };

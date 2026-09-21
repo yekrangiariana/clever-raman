@@ -10,6 +10,7 @@ src/config/devConfig.ts
 .DS_Store
 *.log
 
-# Antigravity AI Instructions
+# Documentation Directory
+docs/
 BUILD_GUIDE.md
 DESIGN_GUIDE.md
