@@ -20,8 +20,13 @@ function createAudioPlayer() {
   const audio = new Audio();
   audio.preload = 'auto';
 
+  const preloadAudio = new Audio();
+  preloadAudio.preload = 'auto';
+  let preloadedTrackId: string | null = null;
+
   const [currentTrack, setCurrentTrack] = createSignal<Song | null>(null);
   const [isPlaying, setIsPlaying] = createSignal<boolean>(false);
+  const [isBuffering, setIsBuffering] = createSignal<boolean>(false);
   const [currentTime, setCurrentTime] = createSignal<number>(0);
   const [duration, setDuration] = createSignal<number>(0);
   const [isSeeking, setIsSeeking] = createSignal<boolean>(false);
@@ -95,18 +100,49 @@ function createAudioPlayer() {
     updateMediaSessionPlaybackState('playing');
   });
 
+  audio.addEventListener('playing', () => {
+    setIsBuffering(false);
+    setIsPlaying(true);
+    updateMediaSessionPlaybackState('playing');
+    const track = currentTrack();
+    if (track) {
+      updateMediaSessionArtwork(track);
+    }
+    // Preload next track once current track is actively playing
+    setTimeout(() => preloadNextTrack(), 1000);
+  });
+
+  audio.addEventListener('waiting', () => {
+    setIsBuffering(true);
+  });
+
+  audio.addEventListener('canplay', () => {
+    setIsBuffering(false);
+  });
+
   audio.addEventListener('pause', () => {
     setIsPlaying(false);
+    setIsBuffering(false);
     updateMediaSessionPlaybackState('paused');
   });
 
   audio.addEventListener('ended', () => {
+    setIsBuffering(false);
     playNextInHierarchy(false);
   });
 
   audio.addEventListener('error', (e) => {
     console.error('Audio playback error', e);
-    setIsPlaying(false);
+    setIsBuffering(false);
+    const track = currentTrack();
+    // If raw stream failed asynchronously during decoding, recover with mp3 transcode
+    if (track && audio.src && !audio.src.includes('format=mp3')) {
+      console.log(`Audio error on raw stream, recovering with mp3 transcode for: ${track.id}`);
+      audio.src = api.getStreamUrl(track.id, 'mp3', 320);
+      audio.play().catch(() => setIsPlaying(false));
+    } else {
+      setIsPlaying(false);
+    }
   });
 
   function updateMediaSessionPlaybackState(state: 'playing' | 'paused' | 'none') {
@@ -149,20 +185,44 @@ function createAudioPlayer() {
   setupMediaSessionActionHandlers();
 
   function updateMediaSessionMetadata(track: Song) {
-    const coverUrl = api.getCoverArtUrl(track.coverArt || track.id, 300);
     const metadata = {
       title: track.title || 'Unknown Title',
       artist: track.artist || 'Unknown Artist',
       album: track.album || '',
-      artwork: coverUrl ? [{ src: coverUrl, sizes: '300x300', type: 'image/png' }] : [],
+      artwork: [],
     };
 
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata(metadata);
+      const coverUrl = api.getCoverArtUrl(track.coverArt || track.id, 300);
+      navigator.mediaSession.metadata = new MediaMetadata({
+        ...metadata,
+        artwork: coverUrl ? [{ src: coverUrl, sizes: '300x300', type: 'image/png' }] : [],
+      });
     }
 
     try {
+      // In native Android Capacitor, avoid sending artwork upfront so it doesn't do a synchronous blocking HttpURLConnection
       MediaSession.setMetadata(metadata).catch(() => {});
+    } catch (e) {}
+  }
+
+  function updateMediaSessionArtwork(track: Song) {
+    const coverUrl = api.getCoverArtUrl(track.coverArt || track.id, 300);
+    if (!coverUrl) return;
+
+    const metadataWithArtwork = {
+      title: track.title || 'Unknown Title',
+      artist: track.artist || 'Unknown Artist',
+      album: track.album || '',
+      artwork: [{ src: coverUrl, sizes: '300x300', type: 'image/png' }],
+    };
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata(metadataWithArtwork);
+    }
+
+    try {
+      MediaSession.setMetadata(metadataWithArtwork).catch(() => {});
     } catch (e) {}
   }
 
@@ -218,33 +278,76 @@ function createAudioPlayer() {
     showToast(label);
   }
 
+  function getOptimalStreamUrl(track: Song): string {
+    const suffix = (track.suffix || '').toLowerCase();
+    const contentType = (track.contentType || '').toLowerCase();
+    const bitRate = track.bitRate || 0;
+
+    // Android Chromium cannot decode ALAC (Apple Lossless in .m4a or .alac containers).
+    // Note: Navidrome reports M4A ALAC tracks with contentType: "audio/mp4" and bitRate > 384.
+    const canPlayAlac = audio.canPlayType('audio/mp4; codecs="alac"') !== '';
+    const isAlac = !canPlayAlac && (
+      suffix === 'alac' ||
+      (suffix === 'm4a' && (contentType.includes('alac') || contentType.includes('apple-lossless') || bitRate > 384))
+    );
+
+    // Only transcode codecs that are genuinely unsupported by Android Chromium WebView.
+    // FLAC is fully supported natively — raw streaming has zero TTFB overhead on LAN.
+    // Requesting format=mp3 for FLAC causes Navidrome to spawn ffmpeg which adds 1-3s startup delay.
+    if (isAlac || suffix === 'wma' || suffix === 'ape' || suffix === 'dsf') {
+      console.log(`[audio] Transcoding unsupported codec (${suffix || contentType}) → mp3 for track ${track.id}`);
+      return api.getStreamUrl(track.id, 'mp3', 320);
+    }
+
+    // FLAC, MP3, AAC, OGG/Opus — all natively supported — stream raw for instant start
+    return api.getStreamUrl(track.id);
+  }
+
+  function preloadNextTrack() {
+    const q = queue();
+    // In derived active queue, index 0 is current, index 1 is next
+    if (q.length > 1) {
+      const nextTrack = q[1];
+      if (nextTrack && nextTrack.id !== preloadedTrackId) {
+        preloadedTrackId = nextTrack.id;
+        try {
+          preloadAudio.src = getOptimalStreamUrl(nextTrack);
+          preloadAudio.load();
+        } catch (e) {}
+      }
+    }
+  }
+
   function startPlaybackStream(track: Song, isRewind = false, skipHistoryRecording = false) {
     const prevTrack = currentTrack();
     if (prevTrack && prevTrack.id !== track.id && !isRewind && !skipHistoryRecording) {
       recordHistory(prevTrack);
     }
     setCurrentTrack(track);
+    setIsBuffering(true);
 
-    const streamUrl = api.getStreamUrl(track.id);
+    // Stop current playback cleanly without destroying the native AudioTrack pipeline
+    audio.pause();
+
+    const streamUrl = getOptimalStreamUrl(track);
     audio.src = streamUrl;
-    audio.play().catch((err) => {
-      if (err.name !== 'AbortError') {
-        console.error('Failed to start audio playback', err);
-        // Fallback to transcoding (mp3) if the browser doesn't support the native codec (e.g. ALAC on Firefox)
-        if (
-          err.name === 'NotSupportedError' || 
-          err.message.includes('not suitable') || 
-          err.message.includes('decode') ||
-          (err.code && err.code === 9) // 9 is DOMException.NOT_SUPPORTED_ERR
-        ) {
-          console.log(`Codec not supported, falling back to mp3 for track: ${track.id}`);
-          audio.src = api.getStreamUrl(track.id, 'mp3');
-          audio.play().catch((e) => {
-            if (e.name !== 'AbortError') console.error('Transcode fallback also failed', e);
-          });
+
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        if (err.name !== 'AbortError') {
+          console.error('Failed to start audio playback', err);
+          // Fallback to transcoding (mp3) if the initial stream failed
+          if (!streamUrl.includes('format=mp3')) {
+            console.log(`Playback failed for ${track.id}, falling back to mp3 transcode`);
+            audio.src = api.getStreamUrl(track.id, 'mp3', 320);
+            audio.play().catch((e) => {
+              if (e.name !== 'AbortError') console.error('Transcode fallback also failed', e);
+            });
+          }
         }
-      }
-    });
+      });
+    }
     updateMediaSessionMetadata(track);
   }
 
@@ -785,6 +888,7 @@ function createAudioPlayer() {
   return {
     currentTrack,
     isPlaying,
+    isBuffering,
     currentTime,
     duration,
     contextQueue,

@@ -14,6 +14,17 @@ interface MobileHomeViewProps {
   onSelectPlaylist?: (playlist: Playlist, coverVariant?: 'station' | 'meshMix') => void;
 }
 
+interface MobileHomeData {
+  recentAlbums: Album[];
+  starredAlbums: Album[];
+  randomAlbums: Album[];
+  playlists: Playlist[];
+  genres: Genre[];
+  fetchError: string;
+}
+
+let cachedMobileHomeData: MobileHomeData | null = null;
+
 export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
   const [homeData, { refetch }] = createResource(async () => {
     let recentAlbums: Album[] = [];
@@ -32,11 +43,24 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
         api.getGenres(),
       ]);
 
-      if (newestRes.status === 'fulfilled') recentAlbums = newestRes.value;
-      if (starredRes.status === 'fulfilled') starredAlbums = starredRes.value;
-      if (randomRes.status === 'fulfilled') randomAlbums = randomRes.value;
-      if (playlistsRes.status === 'fulfilled') playlists = playlistsRes.value;
-      if (genresRes.status === 'fulfilled') genres = genresRes.value;
+      if (newestRes.status === 'fulfilled' && Array.isArray(newestRes.value)) recentAlbums = newestRes.value;
+      if (starredRes.status === 'fulfilled' && Array.isArray(starredRes.value)) starredAlbums = starredRes.value;
+      if (randomRes.status === 'fulfilled' && Array.isArray(randomRes.value)) randomAlbums = randomRes.value;
+      if (playlistsRes.status === 'fulfilled' && Array.isArray(playlistsRes.value)) playlists = playlistsRes.value;
+      if (genresRes.status === 'fulfilled' && Array.isArray(genresRes.value)) genres = genresRes.value;
+
+      // Fallback: If newest returned 0 albums, fetch alphabetical albums so user isn't left with an empty screen
+      if (recentAlbums.length === 0) {
+        try {
+          const fallback = await api.getAlbumList('alphabeticalByName', 20);
+          if (fallback && Array.isArray(fallback) && fallback.length > 0) recentAlbums = fallback;
+        } catch (e) {}
+      }
+
+      // If all album lists returned empty and we have no cached data, flag potential network issue
+      if (recentAlbums.length === 0 && randomAlbums.length === 0 && playlists.length === 0) {
+        fetchError = 'No music returned from server or network unreachable';
+      }
       
       // Explicitly capture network failures from the main query
       if (newestRes.status === 'rejected') {
@@ -47,7 +71,7 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
       fetchError = e.message || String(e);
     }
 
-    return {
+    const result: MobileHomeData = {
       recentAlbums,
       starredAlbums,
       randomAlbums,
@@ -55,13 +79,19 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
       genres,
       fetchError,
     };
+
+    if (recentAlbums.length > 0 || playlists.length > 0) {
+      cachedMobileHomeData = result;
+    }
+
+    return result;
   }, {
-    initialValue: {
-      recentAlbums: api.getCachedAlbumList('newest', 20),
-      starredAlbums: api.getCachedAlbumList('starred', 10),
-      randomAlbums: api.getCachedAlbumList('random', 20),
-      playlists: api.getCachedPlaylists(),
-      genres: api.getCachedGenres(),
+    initialValue: cachedMobileHomeData || {
+      recentAlbums: api.getCachedAlbumList('newest', 20) || [],
+      starredAlbums: api.getCachedAlbumList('starred', 10) || [],
+      randomAlbums: api.getCachedAlbumList('random', 20) || [],
+      playlists: api.getCachedPlaylists() || [],
+      genres: api.getCachedGenres() || [],
       fetchError: ''
     }
   });
@@ -74,7 +104,8 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
     const now = new Date();
     const localDay = Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
 
-    const isDailyRandomPlaylist = (name: string) => {
+    const isDailyRandomPlaylist = (name?: string) => {
+      if (!name) return false;
       const lower = name.toLowerCase().trim();
       return (
         lower.includes('daily random') ||
@@ -85,9 +116,14 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
       );
     };
 
+    const playlistsList = Array.isArray(data.playlists) ? data.playlists : [];
+    const randomAlbumsList = Array.isArray(data.randomAlbums) ? data.randomAlbums : [];
+    const recentAlbumsList = Array.isArray(data.recentAlbums) ? data.recentAlbums : [];
+    const genresList = Array.isArray(data.genres) ? data.genres : [];
+
     // Slot 1: Daily Discovery (Station pulse circle)
-    const discoveryPlaylist = data.playlists.find(
-      (p) => (p.songCount || 0) > 0 && isDailyRandomPlaylist(p.name)
+    const discoveryPlaylist = playlistsList.find(
+      (p) => p && (p.songCount || 0) > 0 && isDailyRandomPlaylist(p.name)
     );
     const slot1 = {
       variant: 'station' as const,
@@ -96,8 +132,8 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
       onClick: () => {
         if (discoveryPlaylist && props.onSelectPlaylist) {
           props.onSelectPlaylist(discoveryPlaylist, 'station');
-        } else if (data.randomAlbums.length > 0) {
-          props.onSelectAlbum(data.randomAlbums[localDay % data.randomAlbums.length]);
+        } else if (randomAlbumsList.length > 0) {
+          props.onSelectAlbum(randomAlbumsList[localDay % randomAlbumsList.length]);
         } else {
           props.onSelectMix('Discovery');
         }
@@ -108,27 +144,32 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
     const todayStr = now.toDateString();
     const albumKey = getScopedKey('navios_daily_album');
     const dateKey = getScopedKey('navios_daily_album_date');
-    let savedAlbumStr = localStorage.getItem(albumKey);
-    let savedAlbumDate = localStorage.getItem(dateKey);
+    let savedAlbumStr: string | null = null;
+    let savedAlbumDate: string | null = null;
+    try {
+      savedAlbumStr = localStorage.getItem(albumKey);
+      savedAlbumDate = localStorage.getItem(dateKey);
+    } catch (e) {}
+
     let randomAlbum: any = null;
-    
     if (savedAlbumDate === todayStr && savedAlbumStr) {
       try { randomAlbum = JSON.parse(savedAlbumStr); } catch(e) {}
     }
     
-    if (!randomAlbum && data.recentAlbums && data.recentAlbums.length > 0) {
-      // Pick a random recent album as album of the day
-      const randIdx = Math.floor(Math.random() * data.recentAlbums.length);
-      randomAlbum = data.recentAlbums[randIdx];
-      localStorage.setItem(albumKey, JSON.stringify(randomAlbum));
-      localStorage.setItem(dateKey, todayStr);
+    if (!randomAlbum && recentAlbumsList.length > 0) {
+      const randIdx = Math.floor(Math.random() * recentAlbumsList.length);
+      randomAlbum = recentAlbumsList[randIdx];
+      try {
+        localStorage.setItem(albumKey, JSON.stringify(randomAlbum));
+        localStorage.setItem(dateKey, todayStr);
+      } catch (e) {}
     }
 
     const slot2 = randomAlbum
       ? {
           categoryLabel: 'Album of the Day',
           variant: 'album' as const,
-          title: randomAlbum.title,
+          title: randomAlbum.title || 'Featured Album',
           subtitle: randomAlbum.artist || 'Unknown Artist',
           coverArtUrl: api.getCoverArtUrl(randomAlbum.coverArt || randomAlbum.id, 500),
           onClick: () => props.onSelectAlbum(randomAlbum),
@@ -144,8 +185,10 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
     };
 
     // Slot 4: Genre Mix (Rotates daily through top genres)
-    const validGenres = data.genres.filter((g) => g.songCount > 4);
-    const chosenGenre = validGenres.length > 0 ? validGenres[localDay % validGenres.length].value : 'Chill';
+    const validGenres = genresList.filter((g) => g && (g.songCount || 0) > 4);
+    const chosenGenre = validGenres.length > 0 && validGenres[localDay % validGenres.length]?.value
+      ? validGenres[localDay % validGenres.length].value
+      : 'Chill';
     const slot4 = {
       categoryLabel: 'Genre Station',
       variant: 'genreMix' as const,
@@ -168,10 +211,10 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
   });
 
   const pinnedPlaylists = createMemo(() => {
-    const allPl = homeData()?.playlists || [];
-    const pinned = pinnedPlaylistIds();
+    const allPl = Array.isArray(homeData()?.playlists) ? homeData()!.playlists : [];
+    const pinned = Array.isArray(pinnedPlaylistIds()) ? pinnedPlaylistIds() : [];
     return pinned
-      .map((id) => allPl.find((p) => p.id === id))
+      .map((id) => allPl.find((p) => p && p.id === id))
       .filter(Boolean) as Playlist[];
   });
 
@@ -357,6 +400,24 @@ export const MobileHomeView: Component<MobileHomeViewProps> = (props) => {
                   </div>
                 );
               }}
+            </For>
+          </div>
+        </div>
+      </Show>
+
+      {/* Loading Skeleton if initial data is loading and no cache exists */}
+      <Show when={homeData.loading && !homeData()?.recentAlbums?.length}>
+        <div class="w-full flex flex-col pt-2 pb-28 animate-pulse">
+          <div class="h-6 w-36 bg-white/10 rounded mb-4" />
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <For each={[1, 2, 3, 4, 5, 6]}>
+              {() => (
+                <div class="flex flex-col">
+                  <div class="aspect-square w-full rounded-2xl bg-white/5 mb-2" />
+                  <div class="h-4 w-3/4 bg-white/10 rounded mb-1" />
+                  <div class="h-3 w-1/2 bg-white/5 rounded" />
+                </div>
+              )}
             </For>
           </div>
         </div>

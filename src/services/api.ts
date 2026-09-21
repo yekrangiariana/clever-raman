@@ -39,6 +39,8 @@ export interface Song {
   genre?: string;
   contentType?: string;
   suffix?: string;
+  bitRate?: number;
+  size?: number;
   path?: string;
   starred?: string;
 }
@@ -368,7 +370,10 @@ class SubsonicApi {
   public getCachedGenres(): Genre[] {
     try {
       const cached = localStorage.getItem('navios_cache_genres');
-      if (cached) return JSON.parse(cached);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return Array.isArray(parsed) ? parsed : [];
+      }
     } catch (e) {}
     return [];
   }
@@ -377,8 +382,9 @@ class SubsonicApi {
     const cacheKey = 'navios_cache_genres';
 
     try {
-      const res = await this.request<{ genres?: { genre?: Genre[] } }>('getGenres.view');
-      const list = res.genres?.genre || [];
+      const res = await this.request<{ genres?: { genre?: Genre[] | Genre } }>('getGenres.view');
+      const raw = res.genres?.genre;
+      const list: Genre[] = raw ? (Array.isArray(raw) ? raw : [raw]) : [];
       this.safeSetItem(cacheKey, JSON.stringify(list));
       return list;
     } catch (err) {
@@ -779,11 +785,12 @@ class SubsonicApi {
   /**
    * Get direct streaming URL (stream.view?id=...)
    */
-  public getStreamUrl(id: string, format?: string): string {
+  public getStreamUrl(id: string, format?: string, maxBitRate?: number): string {
     if (!this.config) return '';
     const auth = this.getAuthParams(false);
     let url = `${this.config.serverUrl}/rest/stream.view?${auth}&id=${encodeURIComponent(id)}`;
     if (format) url += `&format=${format}`;
+    if (maxBitRate) url += `&maxBitRate=${maxBitRate}`;
     return url;
   }
 

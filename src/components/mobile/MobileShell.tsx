@@ -1,4 +1,4 @@
-import { Component, createSignal, Show, onMount, onCleanup, createEffect } from 'solid-js';
+import { Component, createSignal, Show, onMount, onCleanup, createEffect, ErrorBoundary } from 'solid-js';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { Album, Playlist } from '../../services/api';
@@ -131,28 +131,36 @@ export const MobileShell: Component = () => {
           when={selectedAlbum() || selectedPlaylist() || selectedMixGenre()}
           fallback={
             <div class="w-full h-full">
-              <div class={globalActiveTab() === 'home' ? 'w-full h-full' : 'hidden'}>
-                <MobileHomeView
-                  onSelectAlbum={handleSelectAlbum}
-                  onSelectMix={handleSelectMix}
-                  onSelectPlaylist={handleSelectPlaylist}
-                />
-              </div>
-              <div class={globalActiveTab() === 'library' ? 'w-full h-full' : 'hidden'}>
-                <MobileLibraryView
-                  onSelectAlbum={handleSelectAlbum}
-                  onSelectPlaylist={handleSelectPlaylist}
-                />
-              </div>
-              <div class={globalActiveTab() === 'search' ? 'w-full h-full' : 'hidden'}>
-                <MobileSearchView
-                  onSelectAlbum={handleSelectAlbum}
-                  onSelectGenre={(g) => handleSelectMix(g, 'genreMix')}
-                />
-              </div>
-              <div class={globalActiveTab() === 'settings' ? 'w-full h-full' : 'hidden'}>
-                <MobileSettingsView />
-              </div>
+              <ErrorBoundary fallback={(err, reset) => (
+                <div class="p-6 text-center text-red-300 flex flex-col items-center justify-center h-full gap-3">
+                  <p class="font-bold text-sm">Failed to display view</p>
+                  <p class="text-xs text-neutral-400 font-mono">{String(err)}</p>
+                  <button onClick={reset} class="px-4 py-1.5 bg-red-800 text-white text-xs font-bold rounded-xl active:scale-95">Retry</button>
+                </div>
+              )}>
+                <div class={globalActiveTab() === 'home' ? 'w-full h-full' : 'hidden'}>
+                  <MobileHomeView
+                    onSelectAlbum={handleSelectAlbum}
+                    onSelectMix={handleSelectMix}
+                    onSelectPlaylist={handleSelectPlaylist}
+                  />
+                </div>
+                <div class={globalActiveTab() === 'library' ? 'w-full h-full' : 'hidden'}>
+                  <MobileLibraryView
+                    onSelectAlbum={handleSelectAlbum}
+                    onSelectPlaylist={handleSelectPlaylist}
+                  />
+                </div>
+                <div class={globalActiveTab() === 'search' ? 'w-full h-full' : 'hidden'}>
+                  <MobileSearchView
+                    onSelectAlbum={handleSelectAlbum}
+                    onSelectGenre={(g) => handleSelectMix(g, 'genreMix')}
+                  />
+                </div>
+                <div class={globalActiveTab() === 'settings' ? 'w-full h-full' : 'hidden'}>
+                  <MobileSettingsView />
+                </div>
+              </ErrorBoundary>
             </div>
           }
         >
@@ -328,7 +336,6 @@ const MobileGlobalAlbumMenu: Component = () => {
 
   return (
     <>
-      <ServerStatusBanner />
       <AppleContextMenu
         isOpen={!!globalAlbumMenuTarget()}
         triggerRect={globalAlbumMenuTarget()?.triggerRect}

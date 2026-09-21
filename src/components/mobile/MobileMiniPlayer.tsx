@@ -15,7 +15,7 @@ export const MobileMiniPlayer: Component<MobileMiniPlayerProps> = (props) => {
   const coverUrl = createMemo(() => {
     const t = track();
     if (!t) return '';
-    return api.getSongCoverArtUrl(t, 200);
+    return api.getSongCoverArtUrl(t, 300);
   });
 
   const progressPercent = createMemo(() => {

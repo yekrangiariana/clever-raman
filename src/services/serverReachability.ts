@@ -28,7 +28,7 @@ export async function checkServerReachability(): Promise<boolean> {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const cleanUrl = config.serverUrl.replace(/\/+$/, '');
     const hexPass = stringToHex(config.password);
