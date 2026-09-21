@@ -1,69 +1,40 @@
-# 🎵 NaviOS
+# NaviOS
 
-An Apple TV-inspired music client built for [Navidrome](https://www.navidrome.org/) (Subsonic API), designed to bring an elegant, responsive listening experience to both the living room and mobile devices.
+NaviOS is an Apple TV-inspired music client built specifically for personal Navidrome and Subsonic music servers. It gives self-hosters a clean, distraction-free way to listen to their music collection on smart TVs and Android devices.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![webOS](https://img.shields.io/badge/platform-LG%20webOS%20(.ipk)-red.svg)
-![Android](https://img.shields.io/badge/platform-Android%20(.apk)-3DDC84.svg?logo=android&logoColor=white)
-![SolidJS](https://img.shields.io/badge/framework-SolidJS-4d87cd.svg)
-![TailwindCSS](https://img.shields.io/badge/styling-Tailwind%20v4-38bdf8.svg)
+The project currently targets two platforms: LG webOS smart TVs as an installable `.ipk` package, and Android phones, tablets, and foldable devices as an `.apk`. NaviOS is an online-only streaming player. It streams music directly from your home server over the network and does not offer offline downloads or local file storage. Both builds require an active connection to your Navidrome instance to function.
 
 > [!NOTE]
-> **Online-Only Client**: NaviOS streams directly from your personal Navidrome / Subsonic server. There is **no offline playback or local caching of music files** available. Both the webOS and Android builds require an active network connection to your server.
+> NaviOS is under active development. Features, user interface details, and setup procedures are continuously being refined and may change between releases.
 
 ---
 
-## 📌 About the Project
+## About the Project
 
-NaviOS is a personal, open-source hobby project created to solve a simple itch: enjoying a self-hosted Navidrome music library on an LG Smart TV with a clean remote-friendly interface, while also having an equally fluid client on Android phones, tablets, and foldable devices. 
-
-It is free software under the MIT license, built purely for utility and the self-hosting community—no ads, no analytics, no commercial intentions.
+NaviOS started as a personal weekend project to fix a simple frustration: listening to self-hosted music on a living room television using a regular remote control was clunky, while existing mobile players often felt bloated or overly commercial. This app is free, open source under the MIT license, and built strictly for personal utility and the self-hosting community. There are no advertisements, no tracking, and no monetization.
 
 ---
 
-## ✨ Features
+## How It Works
 
-### 🖥️ Dual-Interface Architecture (Adaptive Shell)
-A single SolidJS codebase that automatically detects device context at launch:
-- **TV Shell (`TVShell`)**: Tailored for TV remotes and 1080p/4K screens. Powered by a custom spatial D-pad focus engine, instant navigation without sluggish transition jank, and an Apple TV-inspired dark aesthetic.
-- **Mobile Shell (`MobileShell`)**: Optimized for touchscreens, featuring an iOS/Apple Music-inspired mini-player, slide-over queue drawers, context action sheets, and pull-down dismissals.
-- **Foldable & Tablet Aware**: Native tabletop posture detection (`androidx.window` on Android). When bent half-opened on a desk, controls smoothly adapt into a dedicated tabletop control deck.
+NaviOS adapts automatically depending on whether you are using a television or a mobile device. When running on an LG smart TV, it presents an interface designed for viewing from the couch, navigated entirely with the remote control's directional arrow buttons, select button, and back key. Navigation is tuned for instant response without heavy transition animations that can bog down TV processors.
 
-### 🎶 Playback & Queue Management
-- **Hierarchical 3-Tier Queue**:
-  1. *User Queue Next* (songs inserted explicitly to play next)
-  2. *Context Queue* (the active album or playlist playing passively)
-  3. *User Queue Last* (tracks appended to play after the current context ends)
-- **Played History & Rewind**: Dedicated history tracking allowing you to step back through recently played tracks without losing your active playlist position.
-- **Scrubbing & Precise Seeking**: Smooth timeline seeking with time preview badges and quick skip intervals.
-- **Playback Modes**: Full shuffle and repeat modes (`Off`, `All`, `One`).
-- **Media Session Integration**: Background playback with lock screen and notification controls on Android via Capacitor Media Session, plus standard browser media session support on webOS.
+When launched on an Android phone or tablet, the app presents a touch-oriented interface with an expandable mini-player, full-screen playback screen, and gesture-driven sheets. On foldable devices, NaviOS recognizes when the phone is propped open in tabletop mode and separates the album artwork onto the upright screen while placing playback controls flat on the lower surface.
 
-### 👥 Multi-User Profiles
-- Store multiple accounts/credentials on the same device.
-- Instant switching between profiles with custom gradient avatars.
-- Optional boot profile selector for shared living-room TVs.
-- Independent favorites, pinned playlists, and listening contexts per profile.
+Playback includes a layered queue system. You can queue songs to play immediately next, let an album or playlist run its course in the background, or append tracks to play once your current music finishes. The player also keeps track of your listening history during the session, allowing you to back up through previously heard songs without scrambling your active playlist. You can shuffle, toggle repeat modes, scrub through tracks with live time previews, and control playback directly from your device's lock screen or notification drawer.
 
-### 🔍 Discovery & Browsing
-- **Daily Top Picks**: Rotates dynamic genre mixes, "Album of the Day", and time-of-context playlists (Morning, Afternoon, Evening, Late Night) every 24 hours.
-- **Dynamic Mixes**: Instantly generate dynamic multi-album genre mixes directly from the home screen.
-- **On-Screen Search**: Quick search across artists, albums, and tracks, complete with a remote-friendly on-screen keyboard for TV remotes.
-- **Playlist Management**: Browse server playlists, pin favorites to the top, and edit tracklists directly.
+For households sharing a single TV, NaviOS includes a profile manager. Multiple accounts can be saved on the same device, each with their own server login, custom avatar gradient, pinned playlists, and favorites. An optional launch screen lets you pick who is listening before entering the library.
+
+Every day, the home screen automatically rotates through a selection of dynamic picks. It highlights an album of the day, curates a mix suited for the current time of day (morning, afternoon, evening, or late night), and surfaces rotating genre mixes drawn from your library.
 
 ---
 
-## ⚡ Smart Playlists (`.nsp`)
+## Smart Playlists
 
-Navidrome supports **Smart Playlists**—lightweight JSON files saved with an `.nsp` extension in your music folder that dynamically generate track selections based on rules (e.g., play count, rating, release year, or genre).
+Navidrome includes built-in support for rule-based playlists stored as `.nsp` files on your server. Instead of a fixed list of songs, a smart playlist automatically updates based on criteria you define, such as song ratings, release years, or how recently a track was played. NaviOS reads these playlists and uses them to power the rotating daily picks on your home screen.
 
-NaviOS integrates directly with smart playlists to surface dynamic recommendations on the home screen.
+Setting up a smart playlist only requires dropping a small text file into your Navidrome playlists folder and running a quick library scan from the Navidrome web settings. For example, to create a playlist of four- and five-star songs you haven't heard in the last three months, you can save a file named `ForgottenGems.nsp` containing:
 
-### Example Rules
-
-To create a smart playlist, create a `.nsp` file inside your Navidrome music library (for example, `/music/Playlists/ForgottenGems.nsp`):
-
-**Forgotten Gems** (tracks rated 4+ stars not played in the last 90 days):
 ```json
 {
   "name": "Forgotten Gems",
@@ -78,123 +49,66 @@ To create a smart playlist, create a `.nsp` file inside your Navidrome music lib
 }
 ```
 
-**Top Rated Favorites** (4 and 5-star tracks):
-```json
-{
-  "name": "Top Rated Favorites",
-  "comment": "High-rated library favorites",
-  "all": [
-    { "gt": { "rating": 3 } }
-  ],
-  "sort": "rating",
-  "order": "desc",
-  "limit": 50
-}
-```
-
-### Loading into Navidrome
-1. Save your `.nsp` files in your library's playlist directory.
-2. Trigger a scan in Navidrome (**Settings** $\rightarrow$ **Activity / Library** $\rightarrow$ **Quick Scan**).
-3. The playlists will appear in NaviOS and automatically populate your daily rotation.
-
-> [!TIP]
-> If you'd like to build more elaborate smart playlists without writing JSON by hand, check out the community [Navidrome Smart Playlist Generator](https://github.com/WB2024/Navidrome-SmartPlaylist-Generator-nsp).
+Once scanned by Navidrome, the playlist will show up inside NaviOS alongside your standard playlists and start cycling into your daily recommendations. You can create playlists for particular decades, forgotten favorites, or high-energy genres. If you prefer not to write the configuration rules manually, community tools like the [Navidrome Smart Playlist Generator](https://github.com/WB2024/Navidrome-SmartPlaylist-Generator-nsp) can generate them interactively.
 
 ---
 
-## 🎮 Navigation & Controls
+## Building and Installation
 
-| Input | TV Mode (Remote / Keyboard) | Mobile / Touch Mode |
-| :--- | :--- | :--- |
-| **D-Pad / Arrows** | Directional spatial navigation across cards & lists | Standard touch scroll & tap |
-| **Enter / OK** | Select item / Play track (2nd click opens Now Playing) | Tap to play / Tap row |
-| **Back / Esc** | Step back in view history / Dismiss full-screen player | Swipe down / Back button |
-| **Play / Pause** | TV Remote Play/Pause media key | Mini-player / Player button |
-| **Next / Previous** | Media track skip keys | Next / Prev buttons or lock screen |
+NaviOS is built using Node.js (version 18 or newer), SolidJS, and Capacitor. 
 
----
+### Building for LG webOS TV
 
-## 🛠️ Building & Packaging
-
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or newer)
-- npm
-
----
-
-### 1. LG webOS TV (`.ipk`)
-
-The webOS package is created using a self-contained Node.js packaging script with zero required external dependencies (it will use the official `ares-package` CLI if installed, but automatically falls back to an internal archive builder if not).
+To compile the webOS application, install project dependencies and run the package script:
 
 ```bash
-# Install dependencies
 npm install
-
-# Build production assets and create the .ipk package
 npm run package
 ```
 
-The compiled package will be generated at:
-```text
-dist-webos/org.navios.tv_<version>_all.ipk
+This compiles the production assets and generates an installable `.ipk` file inside the `dist-webos/` folder (named `dist-webos/org.navios.tv_<version>_all.ipk`). The packaging script uses the official webOS TV command line tools if they are detected on your system, but also includes an internal fallback builder so you do not need the full webOS SDK installed just to generate an IPK.
+
+You can install the resulting `.ipk` onto your LG TV using the open-source [webOS Dev Manager](https://github.com/webos-tools/cli-webOS-dev-manager) application or with the official CLI command:
+
+```bash
+ares-install dist-webos/org.navios.tv_<version>_all.ipk -d <your-tv-name>
 ```
 
-#### Installing on LG webOS TV:
-- **Via GUI**: Use [webOS Dev Manager](https://github.com/webos-tools/cli-webOS-dev-manager) to connect to your TV and install the `.ipk`.
-- **Via webOS CLI**:
-  ```bash
-  ares-install dist-webos/org.navios.tv_1.9.109_all.ipk -d <your-tv-name>
-  ```
+### Building for Android
 
----
+Building the Android APK requires OpenJDK 21 and the Android SDK (API level 35).
 
-### 2. Android (`.apk`)
+First, build the web application and sync it into the Android project wrapper:
 
-Android support is powered by [Capacitor](https://capacitorjs.com/). The project is pre-configured with network security policies to support both HTTP and HTTPS local/remote Navidrome instances.
-
-#### Prerequisites for Android Build:
-- **Java JDK**: OpenJDK 21
-- **Android SDK**: API level 35 (Android 15) build tools
-
-#### Build Steps:
 ```bash
-# 1. Build web bundle
 npm run build
-
-# 2. Sync web assets into Android project
 npx cap sync android
+```
 
-# 3. Compile the debug APK
+Next, build the debug package using Gradle:
+
+```bash
 cd android
 ./gradlew assembleDebug
 ```
 
-The generated APK will be located at:
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-```
+The completed APK will be created at `android/app/build/outputs/apk/debug/app-debug.apk`. You can install it directly onto a connected device using `adb install -r android/app/build/outputs/apk/debug/app-debug.apk` or open the `android` directory in Android Studio using `npx cap open android`.
 
-#### Installing on Android Device:
-```bash
-adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-```
-Or open the `android` folder directly in Android Studio (`npx cap open android`) to build and run.
+The Android application is configured with permissions to communicate over both encrypted HTTPS and plain HTTP connections, so you can connect to local network Navidrome instances without certificate issues.
 
----
+### Local Development
 
-## 💻 Local Web Development
-
-To test and run the UI in your desktop browser:
+If you want to run or inspect the application in a standard desktop web browser during development, run:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. By default, desktop browsers with fine pointer input will display the TV shell, while mobile viewport simulation or touch devices will automatically switch to the mobile shell.
+Then navigate to `http://localhost:3000`. By default, desktop browsers will display the TV remote interface, while resizing your browser to a mobile width or toggling touch emulation in developer tools will switch to the touch interface.
 
 ---
 
-## 📄 License
+## License
 
-Distributed under the **MIT License**. See `LICENSE` for details.
+This project is licensed under the MIT License. See `LICENSE` for details.
